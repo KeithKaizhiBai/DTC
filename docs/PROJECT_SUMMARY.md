@@ -243,6 +243,11 @@ The numerical workflows use explicit functions in single scripts. They set `hbar
 - Summary: Rewrote the post-reference supplemental methods section with a fuller derivation of fourth-order Runge--Kutta from Taylor expansion and order conditions, RK4 local/global error and non-unitarity, the Magnus expansion, the fourth-order Gauss--Legendre Magnus formula, and the reason Magnus preserves unitary Schrodinger evolution.
 - Why it matters: The final report now explains the numerical methods at a textbook level sufficient for readers to understand the coefficient choices, error scaling, matrix-state generalization, and unitary-structure difference between RK4 and Magnus.
 
+- Date: 2026-06-04
+- Files changed: `comprehensive_report/comprehensive_report.tex`, `comprehensive_report/comprehensive_report.pdf`, `output/pdf/comprehensive_report.pdf`, `docs/PROJECT_SUMMARY.md`
+- Summary: Rewrote the comprehensive-report numerical-methods supplement from a "why" perspective: RK4 slopes and weights are derived from the exact increment integral, Simpson/Taylor matching, the scalar linear test equation, and the Runge--Kutta order conditions; Magnus4 is derived from time ordering, BCH commutators, the continuum Magnus series, and the two-point Gauss--Legendre commutator coefficient.
+- Why it matters: The report now explains why the RK4 parameters have their particular values and why the Magnus expansion has commutator terms, rather than only stating the final algorithms.
+
 ## 7. Validation and Tests
 
 Planned validation commands:
@@ -341,9 +346,9 @@ Latest current-convention size comparison:
 Latest comprehensive-report checks:
 
 - Command: `pdflatex -interaction=nonstopmode -halt-on-error comprehensive_report.tex` from `comprehensive_report/`.
-- Output: `comprehensive_report/comprehensive_report.pdf`, 23 pages, also copied to `output/pdf/comprehensive_report.pdf`.
+- Output: `comprehensive_report/comprehensive_report.pdf`, 24 pages, also copied to `output/pdf/comprehensive_report.pdf`.
 - Log status: no undefined references and no overfull boxes; only a standard RevTeX/hyperref `nameref` label-definition warning remained.
-- Render check: `pdftoppm -png -r 120 comprehensive_report\comprehensive_report.pdf tmp\pdfs\report_checks\comprehensive_report\page`; title page, figure pages, table page, RK4 derivation pages, Magnus derivation pages, and final checklist page were visually inspected.
+- Render check: `pdftoppm -png -r 120 comprehensive_report\comprehensive_report.pdf tmp\pdfs\report_checks\comprehensive_report\page`; title page, figure pages, table page, RK4 slope/weight derivation pages, RK4 non-unitarity page, Magnus BCH/source page, Gauss--Legendre Magnus4 coefficient page, and final checklist page were visually inspected.
 
 ## 8. Open Problems
 

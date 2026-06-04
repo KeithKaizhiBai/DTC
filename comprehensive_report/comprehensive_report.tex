@@ -369,52 +369,92 @@ t=nT,\quad nT+T/4,\quad nT+T/2,\quad nT+3T/4.
 \end{equation}
 This is why the final noninteracting data include both stroboscopic and fractional-period figures.
 
-\subsection*{S4. Fourth-order Runge--Kutta from Taylor expansion}
+\subsection*{S4. Why RK4 uses four slopes}
 
-The classical fourth-order Runge--Kutta method is easiest to understand first for a general ordinary differential equation
+Start from a general ordinary differential equation
 \begin{equation}
 \frac{dy}{dt}=f(t,y).
 \label{eq:s4-ode}
 \end{equation}
-The exact solution over one step has the Taylor expansion
+The exact one-step increment is not mysterious:
 \begin{equation}
-y(t+h)=y(t)+hy'(t)+\frac{h^2}{2}y''(t)
-+\frac{h^3}{6}y^{(3)}(t)
-+\frac{h^4}{24}y^{(4)}(t)+O(h^5).
-\label{eq:s4-taylor}
+y(t+h)-y(t)=\int_t^{t+h} f(s,y(s))\,ds.
+\label{eq:s4-integral}
 \end{equation}
-The purpose of RK4 is to combine four slope evaluations so that the resulting formula matches Eq.~(\ref{eq:s4-taylor}) through the \(h^4\) term.
+Thus every one-step ODE solver is, at some level, an approximation to this integral of the slope. Euler's method uses only the left-end slope. A midpoint method uses a slope near the center. Simpson-type quadrature suggests that a high-order method should combine beginning, midpoint, and endpoint slope information. RK4 does exactly this, but with a correction: the midpoint and endpoint states are unknown, so they must be predicted from previously computed slopes.
 
-The RK4 stages are
+The classical RK4 choice is
 \begin{align}
 k_1&=f(t_n,y_n),\\
 k_2&=f(t_n+h/2,y_n+hk_1/2),\\
 k_3&=f(t_n+h/2,y_n+hk_2/2),\\
-k_4&=f(t_n+h,y_n+hk_3).
+k_4&=f(t_n+h,y_n+hk_3),
+\label{eq:s4-stages}
 \end{align}
-The update is
+followed by
 \begin{equation}
 y_{n+1}=y_n+h(b_1k_1+b_2k_2+b_3k_3+b_4k_4).
 \label{eq:s4-generic-rk}
 \end{equation}
-The classical weights are
+The two midpoint slopes have different roles. \(k_2\) uses an Euler prediction to the midpoint; \(k_3\) repeats the midpoint evaluation using the improved midpoint direction \(k_2\). Then \(k_4\) uses the improved midpoint direction to predict the endpoint. The four slopes therefore probe the beginning, two corrected midpoints, and the end of the interval.
+
+\subsection*{S5. How the RK4 weights are determined}
+
+The weights \(b_i\) are fixed by asking the method to reproduce the Taylor expansion of the exact flow. The exact solution has
 \begin{equation}
-b_1=\frac{1}{6},\qquad b_2=\frac{1}{3},\qquad
-b_3=\frac{1}{3},\qquad b_4=\frac{1}{6}.
+y(t+h)=y(t)+hy'(t)+\frac{h^2}{2}y''(t)
++\frac{h^3}{6}y^{(3)}(t)
++\frac{h^4}{24}y^{(4)}(t)+O(h^5).
+\label{eq:s5-taylor}
 \end{equation}
-These coefficients are not arbitrary. Expanding each \(k_i\) in powers of \(h\) and matching Eq.~(\ref{eq:s4-taylor}) gives the order conditions. The first few conditions are
+A compact way to see where the classical RK4 weights come from is to apply the stages in Eq.~(\ref{eq:s4-stages}) to the scalar linear test equation
+\begin{equation}
+y'=\lambda y,\qquad z=h\lambda.
+\end{equation}
+For this equation,
+\begin{align}
+k_1&=\lambda y_n,\\
+k_2&=\lambda\left(1+\frac{z}{2}\right)y_n,\\
+k_3&=\lambda\left(1+\frac{z}{2}+\frac{z^2}{4}\right)y_n,\\
+k_4&=\lambda\left(1+z+\frac{z^2}{2}+\frac{z^3}{4}\right)y_n.
+\end{align}
+Substituting into Eq.~(\ref{eq:s4-generic-rk}) gives an amplification polynomial
+\begin{equation}
+\frac{y_{n+1}}{y_n}
+=1+z(b_1+b_2+b_3+b_4)
++z^2\left(\frac{b_2}{2}+\frac{b_3}{2}+b_4\right)
++z^3\left(\frac{b_3}{4}+\frac{b_4}{2}\right)
++z^4\left(\frac{b_4}{4}\right).
+\end{equation}
+The exact solution is \(e^z\), whose Taylor series is
+\begin{equation}
+e^z=1+z+\frac{z^2}{2}+\frac{z^3}{6}+\frac{z^4}{24}+O(z^5).
+\end{equation}
+Matching the coefficients through \(z^4\) gives
 \begin{align}
 b_1+b_2+b_3+b_4&=1,\\
-b_2c_2+b_3c_3+b_4c_4&=\frac{1}{2},\\
-b_2c_2^2+b_3c_3^2+b_4c_4^2&=\frac{1}{3},\\
-b_4a_{43}a_{32}c_2&=\frac{1}{24},
+\frac{b_2}{2}+\frac{b_3}{2}+b_4&=\frac{1}{2},\\
+\frac{b_3}{4}+\frac{b_4}{2}&=\frac{1}{6},\\
+\frac{b_4}{4}&=\frac{1}{24}.
 \end{align}
-with
+Solving from bottom to top gives
+\begin{equation}
+b_4=\frac{1}{6},\qquad b_3=\frac{1}{3},\qquad
+b_2=\frac{1}{3},\qquad b_1=\frac{1}{6}.
+\end{equation}
+This explains the familiar weighted average
+\begin{equation}
+y_{n+1}=y_n+\frac{h}{6}(k_1+2k_2+2k_3+k_4).
+\label{eq:s5-rk4}
+\end{equation}
+In words, the two midpoint slopes carry twice the weight of the endpoint slopes because the midpoint information is what fixes the curvature terms in the Taylor series.
+
+The scalar test equation is not the whole proof for a nonlinear time-dependent system, but it shows the basic logic. The full nonlinear derivation expands every stage \(k_i\) in powers of \(h\) and requires agreement with Eq.~(\ref{eq:s5-taylor}) for all elementary derivative structures. These requirements are the Runge--Kutta order conditions. For the classical choice
 \begin{equation}
 c_1=0,\quad c_2=c_3=\frac{1}{2},\quad c_4=1,\quad
-a_{21}=a_{32}=\frac{1}{2},\quad a_{43}=1.
+a_{21}=a_{32}=\frac{1}{2},\quad a_{43}=1,
 \end{equation}
-Solving the full set of fourth-order conditions gives the familiar RK4 tableau
+the fourth-order conditions are satisfied by the weights above. They are summarized by the Butcher tableau
 \begin{equation}
 \begin{array}{c|cccc}
 0&&&&\\
@@ -426,53 +466,65 @@ Solving the full set of fourth-order conditions gives the familiar RK4 tableau
 \end{array}.
 \end{equation}
 
+\subsection*{S6. RK4 for matrix Schrodinger equations and why it is not unitary}
+
 For the Schrodinger equation, \(y\) is the state vector \(\psi\), and
 \begin{equation}
 f(t,\psi)=-iH(t)\psi.
 \end{equation}
-Nothing in the RK4 derivation requires \(y\) to be a scalar. The same formula applies when \(y\) is a vector and \(f\) contains a matrix-vector product. In implementation, each \(k_i\) is itself a vector of the same dimension as \(\psi\).
+Nothing in the RK4 construction requires \(y\) to be a scalar. If \(\psi\) has \(d\) components, then \(k_1,\ldots,k_4\) are also \(d\)-component vectors. Each stage is just a Hamiltonian matrix-vector product at a chosen time and predicted state.
 
-\subsection*{S5. RK4 accuracy and loss of unitarity}
-
-Because the RK4 formula matches the exact Taylor expansion through \(h^4\), the local truncation error per step is
+Because Eq.~(\ref{eq:s5-rk4}) matches the exact Taylor expansion through \(h^4\), the local truncation error is
 \begin{equation}
-\epsilon_{\rm local}=O(h^5).
+\epsilon_{\rm local}=O(h^5),
 \end{equation}
-For a fixed final time \(T_{\rm final}\), the number of steps is approximately \(N=T_{\rm final}/h\), so accumulated global error scales as
+and the global error over a fixed time interval is
 \begin{equation}
-\epsilon_{\rm global}=N O(h^5)=O(h^4).
+\epsilon_{\rm global}=O(h^4).
 \end{equation}
-This is the sense in which RK4 is a fourth-order method.
+This is the numerical meaning of ``fourth order.''
 
-The important limitation is that RK4 is a polynomial approximation to the exponential propagator, not an exponential itself. For a constant Hamiltonian, \(A=-iH\), one RK4 step gives
+However, RK4 is still a Taylor-polynomial method. For a constant Hamiltonian, \(A=-iH\), one RK4 step is
 \begin{equation}
 \psi_{n+1}=R(hA)\psi_n,
 \end{equation}
-where
+with
 \begin{equation}
 R(z)=1+z+\frac{z^2}{2}+\frac{z^3}{6}+\frac{z^4}{24}.
 \end{equation}
-This is the degree-four Taylor polynomial of \(e^z\). If \(A\) is anti-Hermitian, the exact \(e^{hA}\) is unitary. However, \(R(hA)\) is generally not unitary. For a single eigenmode with \(z=ix\),
+The exact propagator is \(e^{hA}\). If \(H\) is Hermitian, \(A\) is anti-Hermitian and \(e^{hA}\) is unitary. But the polynomial \(R(hA)\) is not exactly unitary. For one eigenmode \(z=ix\),
 \begin{equation}
-|R(ix)|^2
-=1-\frac{x^6}{72}+O(x^8),
+|R(ix)|^2=1-\frac{x^6}{72}+O(x^8).
 \end{equation}
-so even for a constant Hermitian Hamiltonian the RK4 step can slowly change the norm. The error is high order and usually small for small \(h\), but it is not exactly zero.
-
-This explains the diagnostics in the reproduction. RK4 is useful as an independent high-order check, but the norm drift must be monitored:
+Thus RK4 can slowly lose or gain norm even when the exact quantum dynamics conserves norm exactly. This is why RK4 is useful as an independent high-order benchmark but not the preferred long-time unitary propagator. The reproduction monitors
 \begin{equation}
 \delta_{\rm norm}=\max_t
 \left|\,\langle\psi(t)|\psi(t)\rangle-1\,\right|.
 \end{equation}
-In the noninteracting checks the RK4 drift is about \(10^{-3}\), while the Magnus drift is about \(10^{-5}\) for the chosen time grid. For the interacting time-trace code, optional normalization after each RK4 step is used only as a practical stabilizer; it does not make RK4 a genuinely unitary integrator.
+Optional normalization after RK4 steps is a practical stabilizer for time traces; it does not turn RK4 into a structure-preserving unitary method.
 
-\subsection*{S6. Magnus expansion and its logic}
+\subsection*{S7. Why the Magnus expansion exists}
 
-The Magnus idea is to keep the exact exponential structure:
+For the linear equation
+\begin{equation}
+\psi'(t)=A(t)\psi(t),
+\end{equation}
+the exact propagator is a time-ordered exponential. The Magnus method asks whether this time-ordered object can be written as a single ordinary exponential:
 \begin{equation}
 \psi(t+h)=\exp[\Omega(t,h)]\psi(t).
+\label{eq:s7-single-exp}
 \end{equation}
-The generator \(\Omega\) is chosen so that this exponential reproduces the time-ordered exponential. The first terms of the Magnus expansion are
+The answer is yes under standard smoothness and convergence conditions, and the price paid is that \(\Omega\) contains commutators.
+
+One way to see the source of the commutators is to split the interval into small pieces. For two consecutive pieces with generators \(X\) and \(Y\),
+\begin{equation}
+e^X e^Y
+=\exp\left(X+Y+\frac{1}{2}[X,Y]
++\frac{1}{12}[X,[X,Y]]
++\frac{1}{12}[Y,[Y,X]]+\cdots\right),
+\label{eq:s7-bch}
+\end{equation}
+which is the Baker--Campbell--Hausdorff formula. If matrices commute, \(e^Xe^Y=e^{X+Y}\). If they do not commute, the commutators in Eq.~(\ref{eq:s7-bch}) are the correction terms required to compress a product of exponentials into one exponential. Taking the continuum limit of many small time slices gives the Magnus series:
 \begin{align}
 \Omega_1&=\int_t^{t+h} A(t_1)\,dt_1,\\
 \Omega_2&=\frac{1}{2}\int_t^{t+h}dt_1
@@ -482,9 +534,11 @@ The generator \(\Omega\) is chosen so that this exponential reproduces the time-
 \int_t^{t_2}dt_3
 \Big([A_1,[A_2,A_3]]+[A_3,[A_2,A_1]]\Big),
 \end{align}
-where \(A_j=A(t_j)\). The commutators appear because matrix multiplication is noncommutative. If all \(A(t)\) commute, every commutator vanishes and the Magnus expansion reduces to the simple integral \(\Omega=\int A(t)\,dt\).
+where \(A_j=A(t_j)\). This is the ``why'' behind the expansion: the usual integral \(\int A(t)dt\) is sufficient only when generators commute at different times.
 
-For Schrodinger evolution \(A(t)=-iH(t)\) is anti-Hermitian. The commutator of two anti-Hermitian matrices is also anti-Hermitian:
+\subsection*{S8. Why Magnus preserves unitarity}
+
+For Schrodinger evolution \(A(t)=-iH(t)\) is anti-Hermitian. The sum and integral of anti-Hermitian matrices are anti-Hermitian. The commutator of two anti-Hermitian matrices is also anti-Hermitian:
 \begin{equation}
 \begin{aligned}
 \relax
@@ -496,7 +550,7 @@ For Schrodinger evolution \(A(t)=-iH(t)\) is anti-Hermitian. The commutator of t
 &=-[A,B].
 \end{aligned}
 \end{equation}
-Therefore each retained Magnus term is anti-Hermitian. If the numerical approximation \(\Omega_{\rm num}\) is anti-Hermitian, then
+Therefore every retained term in a Magnus approximation is anti-Hermitian. If \(\Omega_{\rm num}^\dagger=-\Omega_{\rm num}\), then
 \begin{equation}
 U_{\rm num}=\exp(\Omega_{\rm num})
 \end{equation}
@@ -506,64 +560,78 @@ U_{\rm num}^\dagger U_{\rm num}
 =\exp(\Omega_{\rm num}^\dagger)\exp(\Omega_{\rm num})
 =\exp(-\Omega_{\rm num})\exp(\Omega_{\rm num})=I.
 \end{equation}
-This is the structural reason the Magnus method is better suited to quantum evolution than a generic Taylor polynomial method.
+This is the key structural difference from RK4. RK4 approximates \(e^{hA}\) by a polynomial. Magnus approximates the generator \(\Omega\) and then exponentiates it, preserving the correct geometric form of quantum time evolution.
 
-\subsection*{S7. Fourth-order Gauss--Legendre Magnus step}
+\subsection*{S9. Why the fourth-order Gauss--Legendre Magnus formula has this form}
 
-The reproduction uses a standard fourth-order two-point Gauss--Legendre Magnus step. Let
+The reproduction uses a fourth-order two-point Gauss--Legendre Magnus step. Let the midpoint of the step be \(t_m=t+h/2\), and define
 \begin{equation}
-t_1=t+\left(\frac{1}{2}-\frac{\sqrt{3}}{6}\right)h,\qquad
-t_2=t+\left(\frac{1}{2}+\frac{\sqrt{3}}{6}\right)h,
+t_1=t_m-\frac{\sqrt{3}}{6}h,\qquad
+t_2=t_m+\frac{\sqrt{3}}{6}h,
 \end{equation}
-and define
+with
 \begin{equation}
 A_1=A(t_1),\qquad A_2=A(t_2).
 \end{equation}
-Two-point Gauss--Legendre quadrature integrates ordinary scalar functions exactly through cubic order. Applying the same idea to the matrix-valued integral gives
+The first Magnus term is the integral of \(A(t)\). Two-point Gauss--Legendre quadrature is chosen because it integrates polynomials through cubic order exactly:
 \begin{equation}
 \Omega_1=\int_t^{t+h}A(s)\,ds
 =\frac{h}{2}(A_1+A_2)+O(h^5).
+\label{eq:s9-omega1}
 \end{equation}
-The leading noncommutative correction comes from \(\Omega_2\). Keeping terms through fourth order yields
+The node distance \(\sqrt{3}/6\) is fixed by this fourth-order quadrature requirement. In midpoint coordinates \(\tau=s-t_m\),
+\begin{equation}
+A(t_m+\tau)=A_0+\tau \dot A_0+\frac{\tau^2}{2}\ddot A_0+\frac{\tau^3}{6}A_0^{(3)}+\cdots.
+\end{equation}
+Using symmetric nodes \(\tau=\pm(\sqrt{3}/6)h\) cancels all odd terms and reproduces the \(h^3\ddot A_0/24\) contribution to the exact integral. This explains the Gauss nodes.
+
+The commutator coefficient is fixed by the second Magnus term. Keeping only the leading noncommuting contribution,
+\begin{equation}
+[A(t_m+\tau_1),A(t_m+\tau_2)]
+=(\tau_2-\tau_1)[A_0,\dot A_0]+O(h^2).
+\end{equation}
+Substituting this into \(\Omega_2\) gives
+\begin{equation}
+\Omega_2=-\frac{h^3}{12}[A_0,\dot A_0]+O(h^5).
+\label{eq:s9-omega2-leading}
+\end{equation}
+Now expand the commutator of the two Gauss-node matrices:
+\begin{equation}
+[A_1,A_2]
+=\frac{\sqrt{3}}{3}h[A_0,\dot A_0]+O(h^3).
+\end{equation}
+Therefore
+\begin{equation}
+-\frac{\sqrt{3}h^2}{12}[A_1,A_2]
+=-\frac{h^3}{12}[A_0,\dot A_0]+O(h^5),
+\end{equation}
+which matches Eq.~(\ref{eq:s9-omega2-leading}). This is why the fourth-order Gauss--Legendre Magnus generator is
 \begin{equation}
 \Omega_{\rm GL4}
 =\frac{h}{2}(A_1+A_2)
 -\frac{\sqrt{3}h^2}{12}[A_1,A_2].
-\label{eq:s7-magnus}
+\label{eq:s9-magnus}
 \end{equation}
-The sign convention follows the ordering used in Eq.~(\ref{eq:s1-ode}) and in the code. Some textbooks write the same formula with the commutator order reversed, which changes the sign because \([A_2,A_1]=-[A_1,A_2]\).
+The formula is not an empirical correction. The first term is fixed by fourth-order quadrature of the ordinary integral, and the second term is fixed by the leading noncommutative part of the exact Magnus expansion.
 
 The numerical update is
 \begin{equation}
 \psi_{n+1}=\exp(\Omega_{\rm GL4})\psi_n.
 \end{equation}
-For a smooth \(A(t)\), this has local error
-\begin{equation}
-\epsilon_{\rm local}=O(h^5),
-\end{equation}
-and global error
-\begin{equation}
-\epsilon_{\rm global}=O(h^4).
-\end{equation}
-Thus it is fourth order, like RK4, but it also preserves the unitary structure of Schrodinger evolution at the level of each step.
+For smooth \(A(t)\), the local error is \(O(h^5)\) and the global error is \(O(h^4)\). Thus Magnus4 and RK4 have the same formal order, but Magnus4 preserves unitarity step by step when \(H(t)\) is Hermitian.
 
-In the two-level calculation, \(\Omega_{\rm GL4}\) is a \(2\times2\) matrix and the matrix exponential is cheap. In the interacting Floquet construction, \(\Omega_{\rm GL4}\) is a \(2^L\times2^L\) matrix for the dense one-period calculation. The step matrices are multiplied to build
+\subsection*{S10. Comparing RK4 and Magnus in this reproduction}
+
+The reason to use both methods is now clear. RK4 is a high-order polynomial slope method whose coefficients are fixed by Taylor matching. It is easy to implement and works for general vector ODEs, so it is a useful independent check. Magnus4 is a high-order exponential method whose coefficients are fixed by time ordering and noncommutativity. It is more expensive, but it respects the unitary structure of Schrodinger evolution.
+
+In the two-level calculation, \(\Omega_{\rm GL4}\) is only \(2\times2\), so the matrix exponential is cheap. In the interacting Floquet construction, \(\Omega_{\rm GL4}\) is a \(2^L\times2^L\) matrix for the dense one-period calculation. The step matrices are multiplied to build
 \begin{equation}
 U(T)\approx U_{N-1}\cdots U_1U_0,\qquad
 U_j=\exp(\Omega_{{\rm GL4},j}).
 \end{equation}
-Since each \(U_j\) is unitary up to floating-point matrix-exponential error, the product is also unitary up to roundoff.
+Since each \(U_j\) is unitary up to floating-point matrix-exponential error, the product is also unitary up to roundoff. This is why the long-time stroboscopic Floquet calculation uses Magnus4 rather than RK4.
 
-\subsection*{S8. Comparing RK4 and Magnus in this reproduction}
-
-Both methods are fourth order, but they control different numerical risks:
-\begin{itemize}
-\item RK4 is simple, explicit, and works for general nonlinear ODEs. It provides an independent benchmark for short-time traces. Its main weakness here is that it does not exactly preserve quantum unitarity.
-\item Fourth-order Magnus is specialized for linear matrix evolution. It is more expensive because of matrix exponentials and commutators, but it respects the exponential and unitary structure of quantum mechanics.
-\end{itemize}
-The reproduction uses this division of labor. RK4 checks whether the waveform is stable under an independent integrator. Magnus is used for unitary-sensitive evolution and for one-period Floquet operators. Agreement between the two over short times gives confidence that the observed period doubling is not an artifact of one particular numerical method.
-
-\subsection*{S9. Many-body basis and Hamiltonian action}
+\subsection*{S11. Many-body basis and Hamiltonian action}
 
 For the interacting chain the computational basis is the \(z\)-basis
 \begin{equation}
@@ -595,7 +663,7 @@ For open boundaries the bond list is
 \end{equation}
 For periodic boundaries the additional bond \((L,1)\) is included.
 
-\subsection*{S10. Initial state and observable evaluation}
+\subsection*{S12. Initial state and observable evaluation}
 
 The all-\(+x\) product state is represented in the \(z\)-basis as
 \begin{equation}
@@ -616,7 +684,7 @@ m_x(nT)=\frac{1}{L}\sum_i\langle\sigma_x^i(nT)\rangle,
 Z(n)=(-1)^n m_x(nT).
 \end{equation}
 
-\subsection*{S11. Long-time Floquet sampling}
+\subsection*{S13. Long-time Floquet sampling}
 
 Directly evolving every period up to \(n=10^{10}\) or \(10^{12}\) is impractical. The reproduction instead constructs the one-period Floquet matrix \(U(T)\) and uses logarithmic sample points. For each sample \(n\), the state is computed by matrix-power action:
 \begin{equation}
@@ -626,12 +694,12 @@ The sample set contains a dense linear prefix for early-time behavior and logari
 
 For \(L=10\), \(U(T)\) is a \(1024\times1024\) complex matrix, which is feasible on a local RTX 4090 and on the H100 node. For \(L=12\), the dimension becomes \(4096\), so memory and runtime must be checked before launching long sweeps.
 
-\subsection*{S12. Practical reproduction checklist}
+\subsection*{S14. Practical reproduction checklist}
 
 A minimal local reproduction proceeds as follows:
 \begin{enumerate}
 \item Set \(\hbar=1\), \(\omega=1\), \(T=2\pi\), and \(\Omega=\alpha/8\).
-\item For the noninteracting model, evolve Eq.~(\ref{eq:s1-ode}) using both Eq.~(\ref{eq:s7-magnus}) and RK4.
+\item For the noninteracting model, evolve Eq.~(\ref{eq:s1-ode}) using both Eq.~(\ref{eq:s9-magnus}) and RK4.
 \item Refine \(\alpha_{13}\) by minimizing the one-period return probability.
 \item For the interacting model, initialize \(|+x\rangle^{\otimes L}\).
 \item Use the paper-label \(J=0.2\) but apply the Pauli-product coefficient \(J_{\rm eff}=0.1\).
