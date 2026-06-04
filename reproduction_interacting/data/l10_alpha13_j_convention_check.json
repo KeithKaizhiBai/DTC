@@ -1,0 +1,22 @@
+{
+  "old_direct_pauli_j_eff_0p2": {
+    "source": "output\\interacting_reproduction_package\\results\\data\\z_stroboscopic_alpha_13_l10.csv",
+    "n_max": 10000000000,
+    "z_min": -0.8885721342289525,
+    "z_final": -0.7284939426008452,
+    "first_n_z_below_0p9": 98,
+    "first_n_z_below_0p8": 160,
+    "first_n_z_below_0p5": 11352,
+    "first_n_z_below_0p0": 200724
+  },
+  "corrected_paper_j_0p2_operator_scale_0p5": {
+    "source": "reproduction_interacting\\data\\z_stroboscopic_alpha_13_l10.csv",
+    "n_max": 10000000000,
+    "z_min": 0.9088579791801286,
+    "z_final": 0.9088579791801286,
+    "first_n_z_below_0p99": 2393630404,
+    "first_n_z_below_0p95": 7251171612,
+    "first_n_z_below_0p9": null,
+    "first_n_z_below_0p8": null
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "open_l10_alpha13_jeff0p1": {
+    "n_max": 10000000000,
+    "sample_count": 1801,
+    "z_min": 0.9088579791801286,
+    "z_final": 0.9088579791801286,
+    "first_n_z_below_0p99": 2393630404,
+    "first_n_z_below_0p95": 7251171612,
+    "first_n_z_below_0p9": null,
+    "first_n_z_below_0p8": null,
+    "first_n_z_below_0p5": null,
+    "first_n_z_below_0p0": null
+  },
+  "periodic_l10_alpha13_jeff0p1": {
+    "n_max": 100000000000,
+    "sample_count": 2001,
+    "z_min": -0.9967548471649453,
+    "z_final": 0.9923496522533153,
+    "first_n_z_below_0p99": 83288862,
+    "first_n_z_below_0p95": 361998744,
+    "first_n_z_below_0p9": 540430471,
+    "first_n_z_below_0p8": 789049238,
+    "first_n_z_below_0p5": 1287688497,
+    "first_n_z_below_0p0": 1922399212
+  }
+}

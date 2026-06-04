@@ -14,16 +14,24 @@
   "time_trace": {
     "length": 10,
     "periods": 40,
-    "steps_per_period": 80,
-    "alpha_labels": ["alpha_81p60", "alpha_13"],
+    "steps_per_period": 120,
+    "alpha_labels": ["alpha_13"],
     "record_stride": 1,
     "normalize_each_step": true
   },
   "stroboscopic": {
-    "lengths": [4, 6, 8, 10],
-    "periods": 80,
-    "steps_per_period": 40,
-    "alpha_labels": ["alpha_81p60", "alpha_13"],
+    "lengths": [10],
+    "periods": 1000000000000,
+    "periods_by_alpha": {
+      "alpha_13": 1000000000000
+    },
+    "steps_per_period": 120,
+    "sampling_mode": "log_floquet",
+    "floquet_integrator": "magnus4",
+    "floquet_precision": "float64",
+    "linear_prefix_periods": 200,
+    "log_sample_count": 2200,
+    "alpha_labels": ["alpha_13"],
     "normalize_each_step": true
   }
 }

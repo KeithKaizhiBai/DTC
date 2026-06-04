@@ -1,0 +1,500 @@
+\documentclass[aps,pra,preprint,superscriptaddress,nofootinbib]{revtex4-2}
+
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{microtype}
+
+\graphicspath{{figures/}}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  citecolor=blue,
+  urlcolor=blue
+}
+
+\begin{document}
+
+\title{Comprehensive Reproduction Report for the Nonsymmorphic Discrete Time Crystal Model}
+\author{Reproduction notes, numerical implementation, and finite-size checks}
+\affiliation{Local CUDA and H100 reproduction workflow}
+\date{\today}
+
+\begin{abstract}
+This report summarizes the reproduction of the nonsymmorphic discrete time crystal model of Hu, Fu, Li, and Shen, Phys. Rev. Research 5, L032024 (2023). The work includes a reading-stage review of the mechanism, a noninteracting two-level reproduction with fourth-order Magnus and Runge--Kutta checks, and an interacting exact state-vector spin-chain reproduction with local and H100-ready workflows. The noninteracting reproduction confirms the special refined point \(\alpha_{13}=80.04624211689759\), where one-period return to the initial instantaneous eigenstate is suppressed and a robust two-period response appears. For the interacting chain, the final convention keeps the paper-label interaction strength \(J/\hbar\omega=0.2\) but applies a Pauli-operator scale factor of \(1/2\), so \(J_{\rm eff}=0.1\) in the implemented \(\sigma_x^i\sigma_x^{i+1}\) term. Under this convention the refined \(\alpha_{13}\) data show the expected lifetime enhancement from \(L=8\) to \(L=10\). The remaining unresolved discrepancy is that the detuned \(\alpha=81.60\) raw \(Z(n)\) trace decays much faster than the paper's Fig. 4(c) under both open and periodic boundary conditions, indicating that the paper's lifetime extraction, interaction normalization, or numerical protocol may differ from the current raw-observable implementation.
+\end{abstract}
+
+\maketitle
+
+\section{Scope and Deliverables}
+
+The target paper proposes a solvable route to discrete time-crystal (DTC) dynamics enforced by a nonsymmorphic dynamical symmetry. The reproduction was organized into four stages:
+\begin{enumerate}
+\item read and summarize the main paper and supplemental material;
+\item reproduce the noninteracting two-level dynamics and compare fourth-order Magnus evolution with a Runge--Kutta benchmark;
+\item reproduce the interacting spin-chain response with CUDA/PyTorch exact state-vector dynamics and HPC-ready parameter files;
+\item collect the theory, numerical methods, figures, diagnostics, and open issues into the present comprehensive report.
+\end{enumerate}
+
+The main project artifacts are the reading report, the noninteracting reproduction report, the interacting reproduction report, the Python scripts, parameter JSON files, selected data tables, and the final report in this directory. The numerical code follows a simple function-based structure so that the physical assumptions are visible at the point of use.
+
+\section{Model and DTC Mechanism}
+
+The single-spin Hamiltonian used throughout the reproduction is
+\begin{equation}
+H_0(t)=\frac{1}{2}\Omega\sin(\omega t)\sigma_x+
+\Omega\sin^2\left(\frac{\omega t}{2}\right)\sigma_y,
+\label{eq:h0}
+\end{equation}
+with the dimensionless convention
+\begin{equation}
+\hbar=1,\qquad \omega=1,\qquad T=2\pi,\qquad
+\Omega=\alpha/8.
+\end{equation}
+The paper's special parameters \(\alpha_n\) are selected by the nonsymmorphic dynamical symmetry. At these points the instantaneous eigenstates swap after one driving period and return only after two periods, producing a subharmonic response at half the drive frequency.
+
+In the interacting stage the implemented chain Hamiltonian is
+\begin{equation}
+H(t)=\sum_{i=1}^{L}H_{0,i}(t)
++J_{\rm eff}\sum_{\langle i,j\rangle}\sigma_x^i\sigma_x^j.
+\label{eq:hint}
+\end{equation}
+The final production convention is
+\begin{equation}
+J_{\rm paper}/\hbar\omega=0.2,\qquad
+J_{\rm eff}=0.5J_{\rm paper}=0.1.
+\label{eq:jconv}
+\end{equation}
+This distinction is important because the code multiplies explicit Pauli matrices, whereas the paper's wording uses spin operators. Directly using \(J=0.2\) as the Pauli-product coefficient was found to overdrive the many-body chain and to produce an unphysical early decay for \(L=10\) at refined \(\alpha_{13}\).
+
+The initial state for the interacting runs is
+\begin{equation}
+|\psi(0)\rangle=\bigotimes_{i=1}^{L}|+x\rangle_i,
+\end{equation}
+matching the main text statement that the spins are initially polarized in the \(x\) direction. The monitored observables are
+\begin{equation}
+m_x(t)=\frac{1}{L}\sum_i
+\langle \psi(t)|\sigma_x^i|\psi(t)\rangle
+\end{equation}
+and the stroboscopic signal
+\begin{equation}
+Z(n)=(-1)^n m_x(nT).
+\end{equation}
+The supplemental material also allows more general \(x\)-product states
+\(\otimes_i |s_i,x\rangle\), but for global \(m_x\) such states can change the amplitude by partial cancellation. The all-\(+x\) state therefore gives the cleanest direct comparison with Fig. 4.
+
+\section{Noninteracting Reproduction}
+
+\subsection{Numerical method}
+
+The noninteracting solver uses two independent time-evolution checks. The first is a fourth-order Gauss--Legendre Magnus integrator, chosen because it preserves the unitary structure more faithfully than a generic explicit integrator. The second is a classical fourth-order Runge--Kutta solver used as an independent benchmark. Both solvers evolve the same two-level Hamiltonian in Eq.~(\ref{eq:h0}).
+
+The refined special point used in all later runs is
+\begin{equation}
+\alpha_{13}=80.04624211689759,
+\end{equation}
+which is close to the paper's tabulated value \(80.07\). The computed one-period return probability at this refined point is \(3.57\times10^{-18}\), consistent with nearly perfect swapping rather than one-period return.
+
+\subsection{Results}
+
+Figure~\ref{fig:nonint-sigmax} compares \(\langle\sigma_x(t)\rangle\) for the refined \(\alpha_{13}\) and detuned \(\alpha=81.60\). The refined parameter produces a clean half-frequency response over the plotted time window. The detuned parameter still has visible subharmonic character over short times, but the detailed waveform and spectrum shift away from the exact-\(\alpha_n\) behavior.
+
+\begin{figure}
+\includegraphics[width=0.92\linewidth]{noninteracting_sigma_x_parameter_comparison.png}
+\caption{Noninteracting \(\sigma_x(t)\) comparison for refined \(\alpha_{13}\) and detuned \(\alpha=81.60\).}
+\label{fig:nonint-sigmax}
+\end{figure}
+
+The fractional-period projection data in Fig.~\ref{fig:nonint-proj} sample \(0,T/4,T/2,3T/4\) within each period. This was added because stroboscopic-only plots can hide the intra-period exchange of instantaneous eigenstate weight.
+
+\begin{figure}
+\includegraphics[width=0.92\linewidth]{noninteracting_fractional_projections_parameter_comparison.png}
+\caption{Fractional-period projection comparison. Sampling within each period exposes the eigenstate exchange that is hidden in integer-period-only plots.}
+\label{fig:nonint-proj}
+\end{figure}
+
+\begin{table}
+\caption{Noninteracting solver diagnostics. Frequencies are normalized by the drive angular frequency.}
+\label{tab:nonint-diagnostics}
+\begin{ruledtabular}
+\begin{tabular}{lcccc}
+case & \(\alpha\) & Magnus norm drift & RK4 norm drift & dominant frequency \\
+\hline
+refined \(\alpha_{13}\) & 80.0462421169 & \(4.02\times10^{-5}\) & \(1.59\times10^{-3}\) & 0.49984 \\
+detuned & 81.60 & \(3.92\times10^{-5}\) & \(1.79\times10^{-3}\) & 0.54983 \\
+\end{tabular}
+\end{ruledtabular}
+\end{table}
+
+The refined point also shows the expected two-period stroboscopic structure, as summarized in Fig.~\ref{fig:nonint-strobe}.
+
+\begin{figure}
+\includegraphics[width=0.86\linewidth]{noninteracting_stroboscopic_alpha_13.png}
+\caption{Stroboscopic projection at refined \(\alpha_{13}\). The two-period structure follows from the nonsymmorphic dynamical symmetry.}
+\label{fig:nonint-strobe}
+\end{figure}
+
+\section{Interacting Reproduction}
+
+\subsection{Implementation and boundary conditions}
+
+The interacting code evolves an exact state vector of dimension \(2^L\). The Hamiltonian action is implemented with bit-flip tensor indexing rather than building dense \(2^L\times2^L\) matrices for ordinary time traces. Long-time stroboscopic sampling uses a dense one-period Floquet operator and logarithmic sampling in \(n\), which makes \(10^{10}\)--\(10^{12}\) period checks feasible for \(L=8\) and \(L=10\).
+
+Open boundary conditions use \(L-1\) nearest-neighbor bonds. Periodic boundary conditions add the final \(L,1\) bond and are controlled by the JSON parameter \texttt{boundary}. Periodic outputs carry a suffix so that they do not overwrite open-boundary results.
+
+The H100 package and local code use the same parameter structure. The current main settings are \(L=10\), open boundary conditions, \(\alpha=81.60\) and refined \(\alpha_{13}\), \(J_{\rm paper}=0.2\), \(\texttt{interaction\_operator\_scale}=0.5\), and \(120\) steps per driving period for the one-period Floquet construction.
+
+\subsection{Short-time response}
+
+The first interacting check reproduces the half-drive-frequency response of \(m_x(t)\) over the first 40 periods. Figure~\ref{fig:int-trace} shows the \(L=10\) time traces. The corresponding spectra have dominant normalized frequency \(0.4998\) for both the refined and detuned parameters over this short window.
+
+\begin{figure}
+\includegraphics[width=0.92\linewidth]{interacting_mx_trace_comparison_l10.png}
+\caption{Interacting \(L=10\) short-time \(m_x(t)\) traces. Short-time period doubling is visible for both refined \(\alpha_{13}\) and detuned \(\alpha=81.60\).}
+\label{fig:int-trace}
+\end{figure}
+
+\subsection{Interaction convention check}
+
+The most important debugging step was the comparison in Fig.~\ref{fig:jconv}. If the paper-label \(J=0.2\) is used directly as a Pauli-product coefficient, the \(L=10\), refined-\(\alpha_{13}\) signal falls below \(Z=0.8\) by \(n=160\). This contradicts the expected stability and the paper-scale result. With the spin-operator convention \(J_{\rm eff}=0.1\), the same \(L=10\) run stays above \(Z=0.9\) through the sampled \(10^{10}\) periods.
+
+\begin{figure}
+\includegraphics[width=0.92\linewidth]{interacting_l10_alpha13_j_convention_check.png}
+\caption{Interaction-coefficient convention check for \(L=10\), refined \(\alpha_{13}\). The corrected convention maps the paper-label \(J=0.2\) to \(J_{\rm eff}=0.1\) for Pauli products.}
+\label{fig:jconv}
+\end{figure}
+
+\subsection{Finite-size comparison}
+
+The current-convention size comparison uses open boundaries, \(J_{\rm eff}=0.1\), fourth-order Magnus one-period Floquet construction, double precision, and logarithmic stroboscopic sampling. The refined \(\alpha_{13}\) case now shows the expected lifetime enhancement from \(L=8\) to \(L=10\), as shown in Fig.~\ref{fig:size-alpha13}. Using the operational threshold \(Z(n)<0.8\), \(L=8\) crosses at \(n=1.9967\times10^8\), while \(L=10\) crosses at \(n=1.5094\times10^{10}\).
+
+\begin{figure}
+\includegraphics[width=0.92\linewidth]{interacting_l8_l10_alpha13_obc_comparison.png}
+\caption{Open-boundary \(L=8\) and \(L=10\) comparison for refined \(\alpha_{13}\) using the corrected interaction convention. The larger chain has a much longer high-\(Z(n)\) interval.}
+\label{fig:size-alpha13}
+\end{figure}
+
+The detuned \(\alpha=81.60\) result remains the main discrepancy. Figure~\ref{fig:size-alpha81} shows that both \(L=8\) and \(L=10\) drop quickly in the raw \(Z(n)\) trace. The threshold \(Z(n)<0.8\) is reached at \(n=3\) for both sizes, and the first negative sampled point occurs at \(n=65\) for \(L=8\) and \(n=78\) for \(L=10\). This is not consistent with a straightforward reading of the paper's Fig. 4(c).
+
+\begin{figure}
+\includegraphics[width=0.92\linewidth]{interacting_l8_l10_alpha81p60_obc_comparison.png}
+\caption{Open-boundary \(L=8\) and \(L=10\) comparison for detuned \(\alpha=81.60\). The raw \(Z(n)\) trace remains much less stable than expected from Fig. 4(c).}
+\label{fig:size-alpha81}
+\end{figure}
+
+\begin{table}
+\caption{Current-convention open-boundary stroboscopic thresholds.}
+\label{tab:int-thresholds}
+\begin{ruledtabular}
+\begin{tabular}{lcccc}
+case & \(L\) & \(n_{\max}\) & first \(Z<0.8\) & first \(Z<0\) \\
+\hline
+\(\alpha=81.60\) & 8 & \(10^5\) & 3 & 65 \\
+\(\alpha=81.60\) & 10 & \(10^5\) & 3 & 78 \\
+refined \(\alpha_{13}\) & 8 & \(10^{12}\) & \(1.9967\times10^8\) & \(4.8793\times10^8\) \\
+refined \(\alpha_{13}\) & 10 & \(10^{12}\) & \(1.5094\times10^{10}\) & \(3.7263\times10^{10}\) \\
+\end{tabular}
+\end{ruledtabular}
+\end{table}
+
+\subsection{Boundary-condition checks}
+
+The code originally used open boundaries. A periodic-boundary interface was added to test whether the detuned discrepancy was caused by boundary choice. For \(L=10\), refined \(\alpha_{13}\), periodic boundaries produced collapse and revival behavior, with first sampled \(Z(n)<0.8\) at \(n=7.8905\times10^8\) and first \(Z(n)<0\) at \(n=1.9224\times10^9\). For detuned \(\alpha=81.60\), both open and periodic boundaries still crossed \(Z(n)<0.8\) by \(n=3\). Boundary choice therefore does not explain the detuned Fig. 4(c) discrepancy.
+
+\section{Reproducibility and HPC Workflow}
+
+The local scripts are:
+\begin{itemize}
+\item \texttt{reproduction\_noninteracting/}\\
+\texttt{reproduce\_noninteracting.py};
+\item \texttt{reproduction\_interacting/}\\
+\texttt{reproduce\_interacting.py}.
+\end{itemize}
+The core interacting cluster launcher is
+\texttt{reproduction\_interacting/}\\
+\texttt{run\_interacting\_hpc.sh}. It creates local \texttt{logs/} and \texttt{results/} directories before execution, records an environment snapshot, and excludes \texttt{gpuh01} because that node was known to have an older CUDA environment. The Slurm partition on the target cluster is \texttt{NV\_H100}, not \texttt{gpu}.
+
+The main local validation commands are
+\begin{verbatim}
+python reproduction_noninteracting\reproduce_noninteracting.py
+python reproduction_interacting\reproduce_interacting.py ^
+  --params reproduction_interacting\params\interacting_params_hpc.json ^
+  --output-root reproduction_interacting --device cuda
+\end{verbatim}
+and the report build command is
+\begin{verbatim}
+pdflatex -interaction=nonstopmode -halt-on-error comprehensive_report.tex
+\end{verbatim}
+
+\section{Assessment}
+
+The reproduction is successful for the central symmetry-enforced mechanism and for the refined \(\alpha_{13}\) interacting stability after the interaction convention is corrected. The following points are now well supported:
+\begin{enumerate}
+\item The noninteracting two-level model displays clean two-period dynamics at the refined \(\alpha_{13}\).
+\item The fractional-period projections show the expected intra-period eigenstate exchange.
+\item The interacting short-time \(m_x(t)\) trace shows a half-drive-frequency peak.
+\item The refined \(\alpha_{13}\) interacting chain has a longer \(Z(n)\) lifetime for \(L=10\) than for \(L=8\) under the corrected \(J_{\rm eff}=0.1\) convention.
+\end{enumerate}
+
+The main remaining risk is the detuned \(\alpha=81.60\) case. Under the current raw observable and both tested boundary conditions, the signal decays much faster than the paper's Fig. 4(c). This could reflect a difference in lifetime definition, observable processing, interaction normalization, or the exact numerical protocol used for the paper. Before making a publication-level claim about the detuned finite-size scaling, the next checks should test alternative interaction normalizations, sign-corrected local autocorrelations, envelope-based lifetime extraction, and \(L=12\) on the H100 if memory allows.
+
+\section{Conclusion}
+
+The project has now reproduced the main nonsymmorphic DTC mechanism and resolved the largest apparent contradiction in the refined-\(\alpha_{13}\) interacting data. The final corrected results support the expected DTC picture: accurate-period dynamics is much more stable than detuned dynamics, and the refined \(\alpha_{13}\) lifetime increases strongly from \(L=8\) to \(L=10\). The detuned Fig. 4(c) quantitative mismatch remains an explicit open problem rather than being hidden in the final report.
+
+\begin{acknowledgments}
+This report summarizes local RTX 4090 calculations, H100-oriented package preparation, and locally ingested H100 output generated during the reproduction workflow.
+\end{acknowledgments}
+
+\begin{thebibliography}{9}
+
+\bibitem{hu2023dtc}
+H. Hu, D. Fu, Y. Li, and S.-Q. Shen,
+``Solvable model for discrete time crystal enforced by nonsymmorphic dynamical symmetry,''
+Phys. Rev. Research \textbf{5}, L032024 (2023).
+
+\bibitem{else2016floquet}
+D. V. Else, B. Bauer, and C. Nayak,
+``Floquet time crystals,''
+Phys. Rev. Lett. \textbf{117}, 090402 (2016).
+
+\bibitem{khemani2016phase}
+V. Khemani, A. Lazarides, R. Moessner, and S. L. Sondhi,
+``Phase structure of driven quantum systems,''
+Phys. Rev. Lett. \textbf{116}, 250401 (2016).
+
+\bibitem{abanin2017effective}
+D. A. Abanin, W. De Roeck, W. W. Ho, and F. Huveneers,
+``Effective Hamiltonians, prethermalization, and slow energy absorption in periodically driven many-body systems,''
+Phys. Rev. B \textbf{95}, 014112 (2017).
+
+\end{thebibliography}
+
+\clearpage
+\section*{Supplemental Material: Equations and Numerical Methods}
+
+This supplemental section is written as a self-contained numerical guide. It explains how the equations in the main report are converted into algorithms, why the fourth-order Magnus and fourth-order Runge--Kutta methods were used, and how the stroboscopic many-body data were generated.
+
+\subsection*{S1. Two-level Schrodinger equation}
+
+For the noninteracting model the state is a two-component spinor
+\begin{equation}
+|\psi(t)\rangle =
+\begin{pmatrix}
+\psi_\uparrow(t)\\
+\psi_\downarrow(t)
+\end{pmatrix}.
+\end{equation}
+The Schrodinger equation is
+\begin{equation}
+i\hbar \frac{d}{dt}|\psi(t)\rangle=H_0(t)|\psi(t)\rangle.
+\end{equation}
+With \(\hbar=1\), this is an ordinary differential equation
+\begin{equation}
+\frac{d}{dt}|\psi(t)\rangle=-iH_0(t)|\psi(t)\rangle.
+\label{eq:s1-ode}
+\end{equation}
+Using
+\begin{equation}
+\sigma_x=
+\begin{pmatrix}
+0&1\\
+1&0
+\end{pmatrix},\qquad
+\sigma_y=
+\begin{pmatrix}
+0&-i\\
+i&0
+\end{pmatrix},
+\end{equation}
+Eq.~(\ref{eq:h0}) becomes
+\begin{equation}
+H_0(t)=
+\begin{pmatrix}
+0 & a(t)-ib(t)\\
+a(t)+ib(t) & 0
+\end{pmatrix},
+\end{equation}
+where
+\begin{equation}
+a(t)=\frac{1}{2}\Omega\sin t,\qquad
+b(t)=\Omega\sin^2\left(\frac{t}{2}\right).
+\end{equation}
+Thus each time step only requires multiplication by a \(2\times2\) Hermitian matrix.
+
+\subsection*{S2. Instantaneous eigenstates and stroboscopic projections}
+
+At each time, \(H_0(t)\) has two instantaneous eigenstates. The paper writes them in a rotating basis, where the nonsymmorphic structure makes the eigenstates exchange after one period. Numerically we do not need to symbolically solve the full Heun-function problem. Instead we evolve the state and project it onto the basis used by the paper:
+\begin{equation}
+P_\chi(t)=|\langle \phi_\chi(t)|\psi(t)\rangle|^2,\qquad \chi=\pm.
+\end{equation}
+The exact-\(\alpha_n\) condition implies that an initial \(\phi_+(0)\) state has almost zero probability to return to \(\phi_+(0)\) after one period:
+\begin{equation}
+P_+(T)\simeq 0.
+\end{equation}
+In the reproduction this condition is used to refine the tabulated \(\alpha_{13}\). The resulting local value is
+\begin{equation}
+\alpha_{13}=80.04624211689759,
+\end{equation}
+with one-period return probability \(3.57\times10^{-18}\).
+
+Integer-period projections show the period-doubled pattern, but they hide the motion inside each period. The reproduction therefore samples
+\begin{equation}
+t=nT,\quad nT+T/4,\quad nT+T/2,\quad nT+3T/4.
+\end{equation}
+This is why the final noninteracting data include both stroboscopic and fractional-period figures.
+
+\subsection*{S3. Fourth-order Magnus method}
+
+For a linear time-dependent equation
+\begin{equation}
+\frac{d}{dt}|\psi(t)\rangle=A(t)|\psi(t)\rangle,\qquad A(t)=-iH(t),
+\end{equation}
+the exact solution over one small step from \(t\) to \(t+\Delta t\) can be written as
+\begin{equation}
+|\psi(t+\Delta t)\rangle=\exp[\Omega_M(t,\Delta t)]|\psi(t)\rangle,
+\end{equation}
+where \(\Omega_M\) is the Magnus generator. The advantage is that if \(H(t)\) is Hermitian, then \(A(t)\) is anti-Hermitian, and the exponential is unitary. This keeps the wavefunction norm under control.
+
+The fourth-order Gauss--Legendre Magnus step used here evaluates the Hamiltonian at two internal nodes:
+\begin{equation}
+t_1=t+\left(\frac{1}{2}-\frac{\sqrt{3}}{6}\right)\Delta t,\qquad
+t_2=t+\left(\frac{1}{2}+\frac{\sqrt{3}}{6}\right)\Delta t.
+\end{equation}
+Define
+\begin{equation}
+A_1=-iH(t_1),\qquad A_2=-iH(t_2).
+\end{equation}
+The fourth-order generator is
+\begin{equation}
+\Omega_M =
+\frac{\Delta t}{2}(A_1+A_2)
+-\frac{\sqrt{3}\Delta t^2}{12}[A_1,A_2],
+\label{eq:s3-magnus}
+\end{equation}
+where
+\begin{equation}
+[A_1,A_2]=A_1A_2-A_2A_1.
+\end{equation}
+The update is then
+\begin{equation}
+|\psi_{k+1}\rangle=\exp(\Omega_M)|\psi_k\rangle.
+\end{equation}
+
+For the two-level problem, the matrix exponential is only \(2\times2\). For the interacting long-time sampling, the same idea is used to build one-period Floquet matrices by multiplying many small unitary steps:
+\begin{equation}
+U(T)\approx U_{N-1}\cdots U_1U_0,
+\end{equation}
+where each \(U_j=\exp(\Omega_{M,j})\). The stroboscopic state is then
+\begin{equation}
+|\psi(nT)\rangle=[U(T)]^n|\psi(0)\rangle.
+\end{equation}
+
+\subsection*{S4. Fourth-order Runge--Kutta method}
+
+The classical fourth-order Runge--Kutta method is used as an independent check. For
+\begin{equation}
+\frac{d}{dt}y(t)=f(t,y),
+\end{equation}
+one step of size \(\Delta t\) is
+\begin{align}
+k_1&=f(t_k,y_k),\\
+k_2&=f(t_k+\Delta t/2,y_k+\Delta t k_1/2),\\
+k_3&=f(t_k+\Delta t/2,y_k+\Delta t k_2/2),\\
+k_4&=f(t_k+\Delta t,y_k+\Delta t k_3),
+\end{align}
+and
+\begin{equation}
+y_{k+1}=y_k+\frac{\Delta t}{6}(k_1+2k_2+2k_3+k_4).
+\end{equation}
+For the Schrodinger equation,
+\begin{equation}
+f(t,\psi)=-iH(t)\psi.
+\end{equation}
+RK4 is accurate to fourth order in the step size, but it is not exactly unitary. Therefore the reproduction records the norm drift:
+\begin{equation}
+\delta_{\rm norm}=\max_t \left|\,\langle\psi(t)|\psi(t)\rangle-1\,\right|.
+\end{equation}
+In the noninteracting checks the RK4 drift is about \(10^{-3}\), while the Magnus drift is about \(10^{-5}\) for the chosen time grid. The two methods nevertheless agree at the level needed for the plotted waveforms.
+
+\subsection*{S5. Many-body basis and Hamiltonian action}
+
+For the interacting chain the computational basis is the \(z\)-basis
+\begin{equation}
+|b_{L-1}\cdots b_1b_0\rangle,\qquad b_i\in\{0,1\}.
+\end{equation}
+The Hilbert-space dimension is \(2^L\). A basis index is stored as an integer
+\begin{equation}
+q=\sum_{i=0}^{L-1}b_i2^i.
+\end{equation}
+Acting with \(\sigma_x^i\) flips bit \(i\):
+\begin{equation}
+q\mapsto q\oplus 2^i,
+\end{equation}
+where \(\oplus\) is bitwise exclusive-or. Acting with \(\sigma_y^i\) also flips the bit but adds a phase:
+\begin{equation}
+\sigma_y|0\rangle=i|1\rangle,\qquad
+\sigma_y|1\rangle=-i|0\rangle.
+\end{equation}
+This lets the code apply the Hamiltonian to the state vector without building a dense many-body Hamiltonian for ordinary time traces.
+
+The interaction term is diagonal in the \(x\)-flipped representation:
+\begin{equation}
+\sigma_x^i\sigma_x^{i+1}|q\rangle
+=|q\oplus2^i\oplus2^{i+1}\rangle.
+\end{equation}
+For open boundaries the bond list is
+\begin{equation}
+(1,2),(2,3),\ldots,(L-1,L).
+\end{equation}
+For periodic boundaries the additional bond \((L,1)\) is included.
+
+\subsection*{S6. Initial state and observable evaluation}
+
+The all-\(+x\) product state is represented in the \(z\)-basis as
+\begin{equation}
+|+x\rangle^{\otimes L}
+=2^{-L/2}\sum_q |q\rangle.
+\end{equation}
+If a site is initialized in \(|-x\rangle\), the code changes the sign of amplitudes with \(b_i=1\). The current production runs use the all-\(+x\) case because it directly maximizes \(m_x(0)\) and matches the main-text Fig. 4 convention.
+
+For a normalized state vector \(\psi_q\), the local \(x\)-magnetization is
+\begin{equation}
+\langle\sigma_x^i\rangle
+=\sum_q \psi_q^*\psi_{q\oplus2^i}.
+\end{equation}
+The averaged magnetization and DTC diagnostic are
+\begin{equation}
+m_x(nT)=\frac{1}{L}\sum_i\langle\sigma_x^i(nT)\rangle,
+\qquad
+Z(n)=(-1)^n m_x(nT).
+\end{equation}
+
+\subsection*{S7. Long-time Floquet sampling}
+
+Directly evolving every period up to \(n=10^{10}\) or \(10^{12}\) is impractical. The reproduction instead constructs the one-period Floquet matrix \(U(T)\) and uses logarithmic sample points. For each sample \(n\), the state is computed by matrix-power action:
+\begin{equation}
+|\psi(nT)\rangle=U(T)^n|\psi(0)\rangle.
+\end{equation}
+The sample set contains a dense linear prefix for early-time behavior and logarithmically spaced points for long-time decay. This keeps the CSV files small while preserving the lifetime-scale information.
+
+For \(L=10\), \(U(T)\) is a \(1024\times1024\) complex matrix, which is feasible on a local RTX 4090 and on the H100 node. For \(L=12\), the dimension becomes \(4096\), so memory and runtime must be checked before launching long sweeps.
+
+\subsection*{S8. Practical reproduction checklist}
+
+A minimal local reproduction proceeds as follows:
+\begin{enumerate}
+\item Set \(\hbar=1\), \(\omega=1\), \(T=2\pi\), and \(\Omega=\alpha/8\).
+\item For the noninteracting model, evolve Eq.~(\ref{eq:s1-ode}) using both Eq.~(\ref{eq:s3-magnus}) and RK4.
+\item Refine \(\alpha_{13}\) by minimizing the one-period return probability.
+\item For the interacting model, initialize \(|+x\rangle^{\otimes L}\).
+\item Use the paper-label \(J=0.2\) but apply the Pauli-product coefficient \(J_{\rm eff}=0.1\).
+\item Build \(U(T)\) with fourth-order Magnus steps and sample \(Z(n)\) at linear-plus-logarithmic periods.
+\item Compare \(Z(n)\) thresholds across \(L\), boundary conditions, and \(\alpha\).
+\end{enumerate}
+The final data show that refined \(\alpha_{13}\) passes this checklist and has the expected longer lifetime at larger \(L\). The detuned \(\alpha=81.60\) case remains the only substantial quantitative mismatch with the paper's plotted Fig. 4(c).
+
+\end{document}

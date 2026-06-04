@@ -6,7 +6,7 @@
   "interaction_j": 0.2,
   "interaction_operator_scale": 0.5,
   "interaction_axis": "x",
-  "boundary": "open",
+  "boundary": "periodic",
   "initial_state": {
     "type": "x_product",
     "signs": "all_plus"
@@ -15,7 +15,7 @@
     "length": 10,
     "periods": 40,
     "steps_per_period": 120,
-    "alpha_labels": ["alpha_81p60", "alpha_13"],
+    "alpha_labels": ["alpha_81p60"],
     "record_stride": 1,
     "normalize_each_step": true
   },
@@ -23,8 +23,7 @@
     "lengths": [10],
     "periods": 100000,
     "periods_by_alpha": {
-      "alpha_81p60": 100000,
-      "alpha_13": 10000000000
+      "alpha_81p60": 100000
     },
     "steps_per_period": 120,
     "sampling_mode": "log_floquet",
@@ -32,7 +31,7 @@
     "floquet_precision": "float64",
     "linear_prefix_periods": 200,
     "log_sample_count": 1600,
-    "alpha_labels": ["alpha_81p60", "alpha_13"],
+    "alpha_labels": ["alpha_81p60"],
     "normalize_each_step": true
   }
 }

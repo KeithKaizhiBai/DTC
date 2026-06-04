@@ -1,5 +1,6 @@
 import argparse
 import json
+import shutil
 import time
 from pathlib import Path
 
@@ -41,6 +42,17 @@ def torch_dtypes(device):
     return torch.float64, torch.complex128
 
 
+def floquet_torch_dtypes(strobe_params, device):
+    precision = strobe_params.get("floquet_precision", "float64")
+    if precision == "float64":
+        return torch.float64, torch.complex128
+    if precision == "float32":
+        return torch.float32, torch.complex64
+    if precision == "auto":
+        return torch_dtypes(device)
+    raise ValueError(f"Unknown floquet_precision: {precision}")
+
+
 def make_output_dirs(output_root):
     output_root = Path(output_root)
     data_dir = output_root / "data"
@@ -52,15 +64,25 @@ def make_output_dirs(output_root):
     return output_root, data_dir, figure_dir, log_dir
 
 
-def make_spin_ops(length, device):
+def interaction_bond_masks(length, boundary):
+    if boundary not in ("open", "periodic"):
+        raise ValueError("boundary must be 'open' or 'periodic'.")
+    masks = [(1 << site) ^ (1 << (site + 1)) for site in range(length - 1)]
+    if boundary == "periodic" and length > 2:
+        masks.append((1 << (length - 1)) ^ 1)
+    return masks
+
+
+def make_spin_ops(length, device, boundary="open"):
     dim = 1 << length
     basis = torch.arange(dim, dtype=torch.long, device=device)
     site_masks = torch.tensor([1 << site for site in range(length)], dtype=torch.long, device=device)
     x_flip = torch.bitwise_xor(basis.unsqueeze(0), site_masks.unsqueeze(1))
 
-    if length > 1:
+    xx_bond_masks = interaction_bond_masks(length, boundary)
+    if xx_bond_masks:
         xx_masks = torch.tensor(
-            [(1 << site) ^ (1 << (site + 1)) for site in range(length - 1)],
+            xx_bond_masks,
             dtype=torch.long,
             device=device,
         )
@@ -82,6 +104,8 @@ def make_spin_ops(length, device):
         "basis": basis,
         "x_flip": x_flip,
         "xx_flip": xx_flip,
+        "boundary": boundary,
+        "interaction_bond_count": len(xx_bond_masks),
         "y_phase": y_phase,
     }
 
@@ -154,24 +178,37 @@ def average_mx(state, ops):
 
 def dense_hamiltonian(t, alpha, interaction_j, ops):
     dim = int(ops["dim"])
-    _, complex_dtype = torch_dtypes(ops["basis"].device)
+    complex_dtype = ops["y_phase"].dtype
     basis_vectors = torch.eye(dim, dtype=complex_dtype, device=ops["basis"].device)
     return hamiltonian_action(basis_vectors, t, alpha, interaction_j, ops)
 
 
 def one_period_floquet_operator(length, alpha, interaction_j, params, device):
-    ops = make_spin_ops(length, device)
+    ops = make_spin_ops(length, device, params.get("boundary", "open"))
     strobe_params = params["stroboscopic"]
     steps_per_period = int(strobe_params["steps_per_period"])
+    integrator = strobe_params.get("floquet_integrator", "magnus4")
     dt = PERIOD / steps_per_period
     dim = int(ops["dim"])
-    _, complex_dtype = torch_dtypes(device)
+    _, complex_dtype = floquet_torch_dtypes(strobe_params, device)
+    ops["y_phase"] = ops["y_phase"].to(complex_dtype)
     floquet = torch.eye(dim, dtype=complex_dtype, device=device)
 
     for step in range(steps_per_period):
-        midpoint_t = (step + 0.5) * dt
-        h_mid = dense_hamiltonian(midpoint_t, alpha, interaction_j, ops)
-        step_unitary = torch.linalg.matrix_exp((-1.0j * dt / HBAR) * h_mid)
+        t = step * dt
+        if integrator == "midpoint":
+            h_mid = dense_hamiltonian(t + 0.5 * dt, alpha, interaction_j, ops)
+            step_generator = (-1.0j * dt / HBAR) * h_mid
+        elif integrator == "magnus4":
+            c1 = 0.5 - np.sqrt(3.0) / 6.0
+            c2 = 0.5 + np.sqrt(3.0) / 6.0
+            a1 = (-1.0j / HBAR) * dense_hamiltonian(t + c1 * dt, alpha, interaction_j, ops)
+            a2 = (-1.0j / HBAR) * dense_hamiltonian(t + c2 * dt, alpha, interaction_j, ops)
+            commutator = a2 @ a1 - a1 @ a2
+            step_generator = 0.5 * dt * (a1 + a2) + (np.sqrt(3.0) * dt * dt / 12.0) * commutator
+        else:
+            raise ValueError(f"Unknown floquet_integrator: {integrator}")
+        step_unitary = torch.linalg.matrix_exp(step_generator)
         floquet = step_unitary @ floquet
 
     return floquet, ops
@@ -225,7 +262,7 @@ def evolve_stroboscopic_floquet(length, alpha, interaction_j, params, device, ma
 
 
 def evolve_trace(length, alpha, interaction_j, params, device):
-    ops = make_spin_ops(length, device)
+    ops = make_spin_ops(length, device, params.get("boundary", "open"))
     state = initial_x_product_state(length, params["initial_state"]["signs"], device)
     trace_params = params["time_trace"]
     steps_per_period = int(trace_params["steps_per_period"])
@@ -250,7 +287,7 @@ def evolve_trace(length, alpha, interaction_j, params, device):
 
 
 def evolve_stroboscopic(length, alpha, interaction_j, params, device, max_period=None):
-    ops = make_spin_ops(length, device)
+    ops = make_spin_ops(length, device, params.get("boundary", "open"))
     state = initial_x_product_state(length, params["initial_state"]["signs"], device)
     strobe_params = params["stroboscopic"]
     steps_per_period = int(strobe_params["steps_per_period"])
@@ -347,24 +384,48 @@ def plot_z_by_length(strobe_results, title, path, use_log_x=False):
     plt.close(fig)
 
 
+def first_threshold_crossings(rows, thresholds):
+    crossings = {}
+    for threshold in thresholds:
+        below = rows[rows[:, 3] < threshold]
+        key = f"first_n_z_below_{str(threshold).replace('.', 'p').replace('-', 'm')}"
+        crossings[key] = None if len(below) == 0 else int(below[0, 0])
+    return crossings
+
+
 def safe_label(label):
     return label.replace(".", "p").replace("=", "").replace(" ", "_")
 
 
+def length_suffix(lengths):
+    clean_lengths = [str(int(length)) for length in lengths]
+    return "_l" + "_".join(clean_lengths)
+
+
+def boundary_suffix(boundary):
+    return "" if boundary == "open" else f"_{safe_label(boundary)}"
+
+
 def run(params, output_root, device):
     output_root, data_dir, figure_dir, log_dir = make_output_dirs(output_root)
-    interaction_j = float(params["interaction_j"])
+    interaction_j_paper = float(params["interaction_j"])
+    interaction_operator_scale = float(params.get("interaction_operator_scale", 1.0))
+    interaction_j = interaction_j_paper * interaction_operator_scale
+    boundary = params.get("boundary", "open")
     if params.get("interaction_axis", "x") != "x":
         raise ValueError("This reproduction script currently implements the paper's mu=x interaction.")
-    if params.get("boundary", "open") != "open":
-        raise ValueError("This reproduction script currently uses open boundary conditions.")
+    if boundary not in ("open", "periodic"):
+        raise ValueError("boundary must be 'open' or 'periodic'.")
 
     diagnostics = {
         "timestamp_unix": time.time(),
         "device": str(device),
         "cuda_device_name": torch.cuda.get_device_name(0) if device.type == "cuda" else None,
-        "interaction_j": interaction_j,
-        "boundary": params.get("boundary", "open"),
+        "interaction_j_paper": interaction_j_paper,
+        "interaction_operator_scale": interaction_operator_scale,
+        "interaction_j_effective": interaction_j,
+        "interaction_convention": "The paper-label J is multiplied by interaction_operator_scale before applying Pauli-matrix products.",
+        "boundary": boundary,
         "trace": {},
         "stroboscopic": {},
     }
@@ -378,9 +439,10 @@ def run(params, output_root, device):
         frequency, amplitudes = spectrum(trace[:, 1], trace[:, 2])
         dominant_frequency = float(frequency[np.argmax(amplitudes[1:]) + 1])
 
-        save_csv(data_dir / f"mx_trace_{label}_l{trace_length}.csv", trace, "t_over_T,t,mx,norm")
+        file_suffix = f"_l{trace_length}{boundary_suffix(boundary)}"
+        save_csv(data_dir / f"mx_trace_{label}{file_suffix}.csv", trace, "t_over_T,t,mx,norm")
         save_csv(
-            data_dir / f"mx_spectrum_{label}_l{trace_length}.csv",
+            data_dir / f"mx_spectrum_{label}{file_suffix}.csv",
             np.column_stack([frequency, amplitudes]),
             "omega_tilde_over_omega,normalized_amplitude",
         )
@@ -388,8 +450,8 @@ def run(params, output_root, device):
             trace,
             frequency,
             amplitudes,
-            f"Interacting mx(t), {alpha_label}, L={trace_length}, J={interaction_j}",
-            figure_dir / f"mx_trace_spectrum_{label}_l{trace_length}.png",
+            f"Interacting mx(t), {alpha_label}, L={trace_length}, {boundary}, J_eff={interaction_j}",
+            figure_dir / f"mx_trace_spectrum_{label}{file_suffix}.png",
         )
 
         trace_results.append(
@@ -411,7 +473,7 @@ def run(params, output_root, device):
             "mx_max": float(np.max(trace[:, 2])),
         }
 
-    plot_trace_comparison(trace_results, figure_dir / f"mx_trace_comparison_l{trace_length}.png")
+    plot_trace_comparison(trace_results, figure_dir / f"mx_trace_comparison_l{trace_length}{boundary_suffix(boundary)}.png")
 
     for alpha_label in params["stroboscopic"]["alpha_labels"]:
         alpha = float(params["alpha_values"][alpha_label])
@@ -425,6 +487,8 @@ def run(params, output_root, device):
             "alpha": alpha,
             "max_period": max_period,
             "sampling_mode": sampling_mode,
+            "floquet_integrator": strobe_params.get("floquet_integrator", "magnus4"),
+            "floquet_precision": strobe_params.get("floquet_precision", "float64"),
             "lengths": {},
         }
         for length in params["stroboscopic"]["lengths"]:
@@ -433,21 +497,30 @@ def run(params, output_root, device):
                 rows, max_norm_error = evolve_stroboscopic_floquet(length, alpha, interaction_j, params, device, max_period)
             else:
                 rows, max_norm_error = evolve_stroboscopic(length, alpha, interaction_j, params, device, max_period)
-            save_csv(data_dir / f"z_stroboscopic_{label}_l{length}.csv", rows, "n,t,mx,z,norm")
+            save_csv(data_dir / f"z_stroboscopic_{label}_l{length}{boundary_suffix(boundary)}.csv", rows, "n,t,mx,z,norm")
             strobe_results.append({"length": length, "rows": rows})
             diagnostics["stroboscopic"][alpha_label]["lengths"][str(length)] = {
+                "boundary": boundary,
+                "interaction_bond_count": len(interaction_bond_masks(length, boundary)),
                 "max_norm_error": max_norm_error,
                 "sample_count": int(len(rows)),
                 "z_min": float(np.min(rows[:, 3])),
                 "z_mean_first_20": float(np.mean(rows[: min(21, len(rows)), 3])),
                 "z_final": float(rows[-1, 3]),
             }
+            diagnostics["stroboscopic"][alpha_label]["lengths"][str(length)].update(
+                first_threshold_crossings(rows, [0.99, 0.95, 0.9, 0.8, 0.5, 0.0])
+            )
+        z_figure_path = figure_dir / f"z_stroboscopic_{label}{length_suffix(params['stroboscopic']['lengths'])}{boundary_suffix(boundary)}.png"
+        legacy_z_figure_path = figure_dir / f"z_stroboscopic_{label}.png"
         plot_z_by_length(
             strobe_results,
-            f"Stroboscopic Z(n), {alpha_label}, J={interaction_j}",
-            figure_dir / f"z_stroboscopic_{label}.png",
+            f"Stroboscopic Z(n), {alpha_label}, J_eff={interaction_j}",
+            z_figure_path,
             use_log_x=(sampling_mode == "log_floquet"),
         )
+        if z_figure_path != legacy_z_figure_path:
+            shutil.copyfile(z_figure_path, legacy_z_figure_path)
 
     with open(data_dir / "diagnostics.json", "w", encoding="utf-8") as handle:
         json.dump(diagnostics, handle, indent=2)
