@@ -19,6 +19,10 @@ The numerical workflows use explicit functions in single scripts. They set `hbar
 ## 3. Important Files
 
 - `Repeat.md`: User-provided task definition.
+- `readme.md`: GitHub-facing project overview and run instructions.
+- `.gitignore`: Excludes LaTeX intermediates, temporary files, logs, and bulky copied output folders.
+- `.gitattributes`: Forces LF line endings for source, scripts, data, and LaTeX files.
+- `requirements.txt`: Minimal Python package list for local reproduction scripts.
 - `prr_2023_Solvable model for discrete time crystal enforced by nonsymmorphic dynamical symmetry.pdf`: Main paper.
 - `prr_2023_SI_Solvable model for discrete time crystal enforced by nonsymmorphic dynamical symmetry.pdf`: Supplemental material.
 - `reading_report/reading_report.md`: Markdown source notes for the English reading report.
@@ -114,6 +118,10 @@ The numerical workflows use explicit functions in single scripts. They set `hbar
 - Milestone: Prepared the interacting-stage report and HPC upload package.
 - Evidence: `reproduction_interacting/reproduction_interacting_report.pdf`, `output/pdf/interacting_reproduction_report.pdf`, and `output/interacting_reproduction_hpc_package.zip`.
 
+- Date: 2026-06-04
+- Milestone: Uploaded the screened project files to GitHub.
+- Evidence: Repository `https://github.com/KeithKaizhiBai/DTC`, branch `main`, commit `392796e`.
+
 ## 6. Recent Major Changes
 
 - Date: 2026-06-04
@@ -160,6 +168,11 @@ The numerical workflows use explicit functions in single scripts. They set `hbar
 - Files changed: `output/interacting_reproduction_package/results/*`, `reproduction_interacting/figures/hpc_z_l8_longtime.png`, `reproduction_interacting/data/hpc_diagnostics_l8.json`, `reproduction_interacting/reproduction_interacting_report.tex`, `reproduction_interacting/reproduction_interacting_report.pdf`, `output/pdf/interacting_reproduction_report.pdf`
 - Summary: Ingested the completed H100 `L=8` cluster run, generated a full-range long-time `Z(n)` figure, and updated the interacting LaTeX/PDF report with HPC diagnostics and larger-system parameter guidance.
 - Why it matters: The interacting report now contains actual cluster data rather than only local validation and package preparation.
+
+- Date: 2026-06-04
+- Files changed: `readme.md`, `.gitignore`, `.gitattributes`, `requirements.txt`, selected report/source/data/figure files in `reading_report/`, `reproduction_noninteracting/`, `reproduction_interacting/`, and `docs/PROJECT_SUMMARY.md`
+- Summary: Screened upload-worthy files and pushed them to `https://github.com/KeithKaizhiBai/DTC` on branch `main`.
+- Why it matters: The GitHub repository now contains the reproducible code, LaTeX/PDF reports, parameters, core data, and figures while excluding original paper PDFs, cluster manuals, temporary files, logs, and bulky copied output folders.
 
 ## 7. Validation and Tests
 
