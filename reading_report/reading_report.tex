@@ -1,0 +1,141 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{microtype}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  citecolor=blue,
+  urlcolor=blue
+}
+
+\title{Reading Report: Solvable Model for Discrete Time Crystal Enforced by Nonsymmorphic Dynamical Symmetry}
+\author{Reproduction notes for the Hu--Fu--Li--Shen DTC project}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This report summarizes the physical background, central model, symmetry mechanism, special parameters, and numerical reproduction targets of Zi-Ang Hu, Bo Fu, Xiao Li, and Shun-Qing Shen, ``Solvable model for discrete time crystal enforced by nonsymmorphic dynamical symmetry,'' \emph{Physical Review Research} \textbf{5}, L032024 (2023). The focus is on understanding how nonsymmorphic dynamical symmetry enforces a period-doubled response in a solvable two-level Floquet model.
+\end{abstract}
+
+\section{Background}
+
+A time crystal is a dynamical phase or regime where time-translation symmetry is broken in the observed motion. For a continuously time-independent equilibrium Hamiltonian, spontaneous breaking of continuous time translation is forbidden. Periodically driven Floquet systems provide a different setting: the Hamiltonian is invariant under discrete time translation by one drive period \(T\), while observables may respond with a larger period, usually \(2T\). This is the defining signature of a discrete time crystal (DTC).
+
+Earlier DTC proposals often relied on disorder, many-body localization (MBL), or prethermal regimes to avoid featureless Floquet heating. MBL is important because it can preserve local memory in disordered interacting systems, allowing a subharmonic response to remain rigid against weak imperfections. However, strict MBL depends strongly on disorder, dimensionality, and finite-size assumptions. Prethermal DTCs relax some of these requirements by producing an exponentially long-lived regime before eventual heating.
+
+The Hu--Fu--Li--Shen paper takes a different starting point. It asks whether nonsymmorphic dynamical symmetry can enforce period extension already at the single-spin level. Interactions then stabilize the observable subharmonic response by suppressing fast off-diagonal oscillations, but the basic period-doubling mechanism originates from symmetry and topology of the instantaneous eigenstates.
+
+\section{Two-Level Model}
+
+The central Hamiltonian is
+\begin{equation}
+H_0(t)
+= \frac{1}{2}\hbar \Omega \sin(\omega t)\sigma_x
+  + \hbar \Omega \sin^2\left(\frac{\omega t}{2}\right)\sigma_y ,
+\label{eq:h0}
+\end{equation}
+where \(\sigma_{x,y,z}\) are Pauli matrices. The drive period is
+\begin{equation}
+T = \frac{2\pi}{\omega}.
+\end{equation}
+The paper defines the dimensionless parameter
+\begin{equation}
+\alpha = \frac{8\Omega}{\omega}.
+\end{equation}
+
+For the reproduction work, the dimensionless convention is
+\[
+\hbar = 1,\qquad \omega = 1,\qquad \Omega = \alpha/8,\qquad T = 2\pi.
+\]
+The instantaneous eigenstates can be written, up to the sign convention used in the paper, as
+\begin{equation}
+\phi_+(t)=\frac{1}{\sqrt{2}}
+\begin{pmatrix}
+e^{-i\omega t/2}\\
+1
+\end{pmatrix},
+\qquad
+\phi_-(t)=\frac{1}{\sqrt{2}}
+\begin{pmatrix}
+-e^{-i\omega t/2}\\
+1
+\end{pmatrix}.
+\end{equation}
+At \(t=0\), \(\phi_+(0)\) is the \(+x\)-polarized spin state.
+
+\section{Nonsymmorphic Dynamical Symmetry}
+
+The model has a dynamical glide symmetry. The symmetry operator has the same period \(T\) as the Hamiltonian, but its eigenvalues and eigenstates interchange after one period and return only after two periods. In this sense, the instantaneous eigenstate bundle has a Mobius twist.
+
+The physical consequence is a mismatch between two periods. The Hamiltonian itself is \(T\)-periodic, while the irreducible representation carried by the instantaneous eigenstates has period \(2T\). This mismatch enforces a subharmonic response without relying on an ordinary avoided-crossing adiabatic picture.
+
+\section{Exact Solution and Special Parameters}
+
+In the instantaneous eigenbasis, the time-dependent Schrodinger equation reduces to a second-order equation whose solution is written in terms of confluent Heun functions. The one-period probability for an initial \(\phi_+(0)\) state to remain in \(\phi_+(0)\) is controlled by the Heun-function value at \(x=\pi/2\).
+
+There is a discrete sequence \(\alpha_n\) where this one-period return probability vanishes. At these values, the state is mapped after one period to the partner instantaneous state up to a phase, and after two periods it returns to the initial state with a Berry phase of \(\pi\). This realizes the DTC response in the solvable two-level model.
+
+The paper lists the following approximate values:
+\begin{table}[h]
+\centering
+\caption{Approximate special values \(\alpha_n\) from the paper.}
+\begin{tabular}{cccccccc}
+\toprule
+\(n\) & 1 & 2 & 3 & 4 & 5 & 6 & 7 \\
+\midrule
+\(\alpha_n\) & 4.21 & 10.73 & 17.11 & 23.44 & 29.75 & 36.07 & 42.36 \\
+\bottomrule
+\end{tabular}
+
+\vspace{0.6em}
+\begin{tabular}{cccccccc}
+\toprule
+\(n\) & 8 & 9 & 10 & 11 & 12 & 13 & 14 \\
+\midrule
+\(\alpha_n\) & 48.66 & 54.95 & 61.24 & 67.46 & 73.76 & 80.07 & 86.34 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+For large \(n\), the asymptotic estimate is
+\begin{equation}
+\alpha_n \simeq 2\pi n - \frac{\pi}{2}.
+\end{equation}
+The noninteracting reproduction focuses on the table value near \(\alpha_{13}\) and on the detuned value \(\alpha=81.60\), which is used in the paper's noninteracting Fig.~4(a).
+
+\section{Observables and Reproduction Targets}
+
+The main noninteracting observable is
+\begin{equation}
+\langle \sigma_x(t)\rangle = \langle \psi(t)|\sigma_x|\psi(t)\rangle ,
+\end{equation}
+for the initial \(+x\)-polarized state. When \(\alpha\) is detuned from \(\alpha_n\), the off-diagonal term in the instantaneous basis contains a rapid dynamical phase factor,
+\begin{equation}
+\exp\left[-i\alpha \sin^2\left(\frac{\omega t}{4}\right)\right],
+\end{equation}
+which creates rapid oscillations and multiple Fourier peaks in \(\langle\sigma_x(t)\rangle\). In the interacting model, the paper argues that interactions suppress these fast oscillations and stabilize a cleaner period-doubled average magnetization.
+
+The first reproduction stage therefore has six concrete targets:
+\begin{enumerate}
+  \item implement the two-level Hamiltonian in Eq.~\eqref{eq:h0};
+  \item use the initial \(+x\)-polarized state;
+  \item evolve over the first 40 drive periods;
+  \item compute \(\langle\sigma_x(t)\rangle\) and its Fourier spectrum for \(\alpha=81.60\);
+  \item compare a unitary fourth-order Magnus solver with a fourth-order Runge--Kutta solver;
+  \item verify that the refined value near \(\alpha_{13}\) produces nearly perfect two-period stroboscopic behavior.
+\end{enumerate}
+
+\section{Conclusion}
+
+The key lesson of the paper is that a nonsymmorphic dynamical symmetry can impose a Mobius twist on instantaneous eigenstates, making the state evolution subharmonic to the Hamiltonian drive. This provides an analytically controlled route to a DTC-like response. The noninteracting calculation tests the basic symmetry-enforced mechanism, while the interacting extension addresses stabilization and prethermal lifetime.
+
+\end{document}

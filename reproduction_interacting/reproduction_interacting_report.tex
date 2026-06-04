@@ -1,0 +1,226 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{microtype}
+
+\graphicspath{{figures/}}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  citecolor=blue,
+  urlcolor=blue
+}
+
+\title{Interacting Spin-Chain Reproduction Report for the Nonsymmorphic DTC Model}
+\author{Local CUDA validation, H100 long-time run, and next-run guidance}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This report documents the interacting-stage reproduction of the nonsymmorphic discrete-time-crystal model. The calculation adds nearest-neighbor Ising interactions to the previously reproduced two-level drive, validates the implementation on the local RTX 4090 GPU, and incorporates an \(L=8\) long-time H100 run for the stroboscopic diagnostic \(Z(n)\).
+\end{abstract}
+
+\section{Scope}
+
+The goal is to reproduce the interacting behavior discussed around Fig.~4(b--d) of Hu, Fu, Li, and Shen, \emph{Physical Review Research} \textbf{5}, L032024 (2023). The local calculation is intentionally small: it verifies the model, observable definitions, parameter choices, and qualitative DTC response. The cluster calculation then focuses on the \(L=8\) long-time stroboscopic behavior.
+
+\section{Hamiltonian}
+
+The interacting chain Hamiltonian is
+\begin{equation}
+H(t)=\sum_{i=1}^{L}H_{0,i}(t)
+ + J\sum_{i=1}^{L-1}\sigma_x^i\sigma_x^{i+1},
+\label{eq:interacting-h}
+\end{equation}
+with open boundary conditions and
+\begin{equation}
+H_{0,i}(t)
+=\frac{1}{2}\Omega\sin(t)\sigma_x^i
+ +\Omega\sin^2\left(\frac{t}{2}\right)\sigma_y^i.
+\end{equation}
+The dimensionless convention is
+\[
+\hbar=1,\qquad \omega=1,\qquad T=2\pi,\qquad \Omega=\alpha/8.
+\]
+The interaction direction is \(\mu=x\), matching the main-text interacting figure. The interaction strength is
+\[
+J/\hbar\omega=0.2.
+\]
+
+Two values of \(\alpha\) are used:
+\[
+\alpha=81.60,\qquad \alpha_{13}=80.04624211689759.
+\]
+The first is the detuned value used in the main-text finite-size lifetime plot, while the second is the refined special value near the paper's tabulated \(\alpha_{13}\approx 80.07\).
+
+\section{Initial State and Observables}
+
+The initial state is the product state polarized in the \(+x\) direction,
+\begin{equation}
+|\psi(0)\rangle=\bigotimes_{i=1}^{L}|+x\rangle_i.
+\end{equation}
+The primary observable is the average \(x\)-magnetization,
+\begin{equation}
+m_x(t)=\frac{1}{L}\sum_{i=1}^{L}
+\langle\psi(t)|\sigma_x^i|\psi(t)\rangle.
+\end{equation}
+At stroboscopic times \(t=nT\), the reported DTC order diagnostic is
+\begin{equation}
+Z(n)=(-1)^n m_x(nT).
+\end{equation}
+If the response is period-doubled and stable, \(Z(n)\) remains positive and slowly varying over a long time window.
+
+\section{Numerical Method}
+
+The local calculation uses an exact state vector of dimension \(2^L\). Instead of constructing dense Hamiltonian matrices, the script applies the Hamiltonian to the state by precomputed bit-flip index arrays:
+\begin{itemize}
+  \item \(\sigma_x^i\) flips one bit;
+  \item \(\sigma_y^i\) flips one bit with the appropriate \(\pm i\) phase;
+  \item \(\sigma_x^i\sigma_x^{i+1}\) flips two neighboring bits.
+\end{itemize}
+This keeps the implementation transparent while allowing small GPU simulations. Time evolution uses fourth-order Runge--Kutta with per-step normalization. The normalization controls accumulated RK4 norm drift during many-period runs; the saved diagnostics still report the observed norm error after normalization.
+
+For the long-time HPC run, direct step-by-step evolution to \(10^5\)--\(10^8\) periods would be inefficient and would produce unnecessarily large output files. Instead, the code constructs the one-period Floquet operator for \(L=8\) using midpoint matrix exponentials over one drive period, diagonalizes this \(256\times256\) unitary matrix, and evaluates \(Z(n)\) at logarithmically spaced stroboscopic periods. This is why the \(L=8\) cluster job can finish quickly while still probing the relevant period range.
+
+\section{Local CUDA Validation}
+
+The validation run used the local NVIDIA GeForce RTX 4090. The time trace used \(L=10\), 40 periods, and 80 time steps per period. The stroboscopic scan used \(L=4,6,8,10\), 80 periods, and 40 time steps per period.
+
+\begin{table}[h]
+\centering
+\caption{Local interacting validation diagnostics.}
+\label{tab:diagnostics}
+\begin{tabular}{lcc}
+\toprule
+Quantity & \(\alpha=81.60\) & refined \(\alpha_{13}\) \\
+\midrule
+Trace length & 10 & 10 \\
+Dominant \(\tilde{\omega}/\omega\) & 0.4998 & 0.4998 \\
+Maximum norm error & \(1.19\times 10^{-7}\) & \(1.19\times 10^{-7}\) \\
+Minimum \(m_x(t)\) over trace & -0.9932 & -0.9932 \\
+Maximum \(m_x(t)\) over trace & 1.0000 & 1.0000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Results}
+
+Figure~\ref{fig:mx-comparison} shows the first 40 periods for \(L=10\). The two parameter values overlap closely in this local time window. Most importantly, the Fourier spectrum has a dominant peak at \(\tilde{\omega}/\omega\simeq 0.5\), matching the paper's statement that interactions stabilize a cleaner subharmonic response.
+
+\begin{figure}[p]
+\centering
+\includegraphics[width=0.95\linewidth]{mx_trace_comparison_l10.png}
+\caption{Interacting \(m_x(t)\) and Fourier spectra for \(L=10\), \(J=0.2\), and the two \(\alpha\) values.}
+\label{fig:mx-comparison}
+\end{figure}
+
+Figures~\ref{fig:z-detuned} and \ref{fig:z-alpha13} show the stroboscopic diagnostic \(Z(n)\). The smallest chain, \(L=4\), has strong finite-size oscillations and decays within the local window. The larger local chains, especially \(L=6,8,10\), retain \(Z(n)\approx 0.95\)--\(0.98\) across the 80 simulated periods. This verifies that the local implementation captures the interaction-stabilized period-doubled response, while longer-time finite-size scaling should be run on the cluster.
+
+\begin{figure}[p]
+\centering
+\includegraphics[width=0.88\linewidth]{z_stroboscopic_alpha_81p60.png}
+\caption{Stroboscopic \(Z(n)\) for \(\alpha=81.60\), \(J=0.2\), and small chain lengths.}
+\label{fig:z-detuned}
+\end{figure}
+
+\begin{figure}[p]
+\centering
+\includegraphics[width=0.88\linewidth]{z_stroboscopic_alpha_13.png}
+\caption{Stroboscopic \(Z(n)\) for refined \(\alpha_{13}\), \(J=0.2\), and small chain lengths.}
+\label{fig:z-alpha13}
+\end{figure}
+
+\section{HPC Long-Time Result for \(L=8\)}
+
+The cluster run used one NVIDIA H100 80GB GPU on node \texttt{gpuh14}. The Slurm launcher excluded \texttt{gpuh01}. The time-trace part used \(L=8\), 40 periods, and 120 time steps per period. The stroboscopic part used the Floquet logarithmic-sampling mode:
+\[
+\alpha=81.60:\ n_{\max}=10^5,\qquad
+\alpha_{13}=80.04624211689759:\ n_{\max}=10^8.
+\]
+Both cases retain a dominant Fourier peak at \(\tilde{\omega}/\omega=0.4998958550\) in the first 40 periods, consistent with period doubling.
+
+\begin{table}[h]
+\centering
+\caption{HPC \(L=8\) stroboscopic diagnostics. The threshold periods are the first sampled \(n\) where \(Z(n)\) drops below the listed value.}
+\label{tab:hpc-l8}
+\begin{tabular}{lcc}
+\toprule
+Quantity & \(\alpha=81.60\) & refined \(\alpha_{13}\) \\
+\midrule
+Maximum sampled period & \(10^5\) & \(10^8\) \\
+Number of samples & 1793 & 1801 \\
+Maximum norm error & \(2.39\times10^{-5}\) & \(1.64\times10^{-5}\) \\
+First \(Z(n)<0.8\) & 12 & 82839 \\
+First \(Z(n)<0.5\) & 2018 & 138896 \\
+First \(Z(n)<0\) & 3642 & 212790 \\
+Final sampled \(Z(n)\) & 0.6633 & -0.0351 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Figure~\ref{fig:hpc-z-l8} shows the long-time \(L=8\) stroboscopic result on a logarithmic period axis. The detuned case, \(\alpha=81.60\), loses the high-\(Z\) plateau quickly and crosses below \(Z=0.8\) at \(n=12\) in the sampled data. The refined value \(\alpha_{13}\) remains near \(Z\simeq1\) through much longer times and first drops below \(Z=0.8\) near \(n=8.3\times10^4\). This confirms the expected qualitative trend from Fig.~4: tuning to the special \(\alpha_n\) strongly enhances the lifetime, even though the finite \(L=8\) system eventually shows revivals and sign-changing oscillations.
+
+\begin{figure}[p]
+\centering
+\includegraphics[width=0.98\linewidth]{hpc_z_l8_longtime.png}
+\caption{HPC long-time stroboscopic \(Z(n)\) for \(L=8\), \(J=0.2\). The horizontal dashed line marks \(Z=0.8\), a useful operational lifetime threshold.}
+\label{fig:hpc-z-l8}
+\end{figure}
+
+\section{Generated Files}
+
+The local stage generated:
+\begin{itemize}
+  \item \texttt{reproduce\_interacting.py};
+  \item \texttt{params/interacting\_params\_local.json};
+  \item \texttt{params/interacting\_params\_hpc.json};
+  \item \texttt{data/mx\_trace\_*.csv};
+  \item \texttt{data/mx\_spectrum\_*.csv};
+  \item \texttt{data/z\_stroboscopic\_*.csv};
+  \item \texttt{data/diagnostics.json};
+  \item \texttt{figures/mx\_trace\_comparison\_l10.png};
+  \item \texttt{figures/z\_stroboscopic\_alpha\_81p60.png};
+  \item \texttt{figures/z\_stroboscopic\_alpha\_13.png};
+  \item \texttt{figures/hpc\_z\_l8\_longtime.png};
+  \item \texttt{run\_interacting\_hpc.sh}.
+\end{itemize}
+
+\section{HPC Package and Larger-System Parameters}
+
+The upload package contains the Python script, local and HPC parameter files, a bash launcher, and empty \texttt{logs/} and \texttt{results/} directories. The HPC launcher includes
+\[
+\texttt{\#SBATCH --exclude=gpuh01}
+\]
+so that the old-CUDA \texttt{gpuh01} node is excluded.
+
+\subsection*{How to Change the Next Run}
+
+The main file to edit is \texttt{params/interacting\_params\_hpc.json}. For a larger system, change only the stroboscopic length list and, if needed, the maximum sampled periods:
+\begin{verbatim}
+"stroboscopic": {
+  "lengths": [10],
+  "periods_by_alpha": {
+    "alpha_81p60": 100000,
+    "alpha_13": 10000000000
+  },
+  "steps_per_period": 120,
+  "sampling_mode": "log_floquet",
+  "linear_prefix_periods": 200,
+  "log_sample_count": 1600
+}
+\end{verbatim}
+For \(L=10\), the Floquet matrix dimension is \(2^{10}=1024\), which is still realistic on an H100 but more expensive than the \(L=8\) run. For \(L=12\), the matrix dimension is \(4096\), and the dense Floquet path may become memory- and time-intensive because it repeatedly exponentiates dense matrices. A pragmatic next step is therefore \(L=10\) before attempting \(L=12\).
+
+\section{Limitations and Next Step}
+
+The current long-time run is only for \(L=8\), so it does not yet reproduce the full finite-size lifetime scaling inset of Fig.~4(c,d). The next step is to repeat the same Floquet logarithmic-sampling workflow for \(L=10\), then compare the threshold period \(n_c\) against the \(L=8\) result. If the \(L=10\) dense Floquet run remains affordable, \(L=12\) can be attempted afterward.
+
+\end{document}

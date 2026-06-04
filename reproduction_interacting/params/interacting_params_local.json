@@ -1,0 +1,28 @@
+{
+  "alpha_values": {
+    "alpha_13": 80.04624211689759,
+    "alpha_81p60": 81.6
+  },
+  "interaction_j": 0.2,
+  "interaction_axis": "x",
+  "boundary": "open",
+  "initial_state": {
+    "type": "x_product",
+    "signs": "all_plus"
+  },
+  "time_trace": {
+    "length": 10,
+    "periods": 40,
+    "steps_per_period": 80,
+    "alpha_labels": ["alpha_81p60", "alpha_13"],
+    "record_stride": 1,
+    "normalize_each_step": true
+  },
+  "stroboscopic": {
+    "lengths": [4, 6, 8, 10],
+    "periods": 80,
+    "steps_per_period": 40,
+    "alpha_labels": ["alpha_81p60", "alpha_13"],
+    "normalize_each_step": true
+  }
+}

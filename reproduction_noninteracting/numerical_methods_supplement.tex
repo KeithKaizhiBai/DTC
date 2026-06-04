@@ -1,0 +1,149 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{microtype}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  citecolor=blue,
+  urlcolor=blue
+}
+
+\title{Supplementary Note: Fourth-Order Magnus and Runge--Kutta Methods}
+\author{Noninteracting nonsymmorphic DTC reproduction}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This supplementary note gives the numerical-method details used in the noninteracting reproduction of the two-level nonsymmorphic discrete-time-crystal model. It explains the fourth-order Gauss--Legendre Magnus propagator, the fourth-order Runge--Kutta comparison solver, the exact \(2\times2\) exponential used in the implementation, and the diagnostics used to judge accuracy and unitarity.
+\end{abstract}
+
+\section{Schrodinger Equation and Notation}
+
+The dimensionless noninteracting calculation solves
+\begin{equation}
+\frac{d}{dt}|\psi(t)\rangle = A(t)|\psi(t)\rangle,
+\qquad
+A(t)=-iH_0(t),
+\end{equation}
+where \(\hbar=1\), \(\omega=1\), and
+\begin{equation}
+H_0(t)
+=\frac{1}{2}\Omega\sin(t)\sigma_x
+ +\Omega\sin^2\left(\frac{t}{2}\right)\sigma_y.
+\end{equation}
+Because \(H_0(t)\) is Hermitian, \(A(t)\) is anti-Hermitian. The exact propagator \(U(t+\Delta t,t)\) is therefore unitary.
+
+\section{Magnus Expansion}
+
+The exact local propagator can be written as
+\begin{equation}
+U(t+\Delta t,t)=\exp[\Omega(t,\Delta t)],
+\end{equation}
+where \(\Omega(t,\Delta t)\) is the Magnus generator. Its first terms are
+\begin{align}
+\Omega_1 &= \int_t^{t+\Delta t} A(t_1)\,dt_1,\\
+\Omega_2 &= \frac{1}{2}\int_t^{t+\Delta t}dt_1
+\int_t^{t_1}dt_2\,[A(t_1),A(t_2)].
+\end{align}
+Higher-order terms contain nested commutators. If \(A(t)\) is anti-Hermitian, every term in the Magnus generator is anti-Hermitian. Hence \(\exp(\Omega)\) is unitary.
+
+\section{Fourth-Order Gauss--Legendre Magnus Step}
+
+The implemented fourth-order step evaluates the generator at two Gauss--Legendre nodes,
+\begin{equation}
+c_1=\frac{1}{2}-\frac{\sqrt{3}}{6},\qquad
+c_2=\frac{1}{2}+\frac{\sqrt{3}}{6},
+\end{equation}
+\begin{equation}
+A_1=A(t+c_1\Delta t),\qquad
+A_2=A(t+c_2\Delta t).
+\end{equation}
+The fourth-order Magnus approximation is
+\begin{equation}
+\Omega_M
+=\frac{\Delta t}{2}(A_1+A_2)
+ -\frac{\sqrt{3}\Delta t^2}{12}[A_1,A_2].
+\label{eq:magnus4}
+\end{equation}
+The update is
+\begin{equation}
+|\psi(t+\Delta t)\rangle = \exp(\Omega_M)|\psi(t)\rangle.
+\end{equation}
+Equation~\eqref{eq:magnus4} has local error \(O(\Delta t^5)\) and global error \(O(\Delta t^4)\). Since \(\Omega_M\) is anti-Hermitian, the update is exactly unitary in exact arithmetic.
+
+\section{Analytic Exponential for a Two-Level System}
+
+The two-level Hamiltonian is traceless, so the Magnus generator is a traceless \(2\times2\) anti-Hermitian matrix. For such a matrix,
+\begin{equation}
+\Omega_M^2=-\theta^2 I,
+\qquad
+\theta^2=-\frac{1}{2}\mathrm{tr}(\Omega_M^2).
+\end{equation}
+Therefore,
+\begin{equation}
+\exp(\Omega_M)=
+\cos\theta\,I+\frac{\sin\theta}{\theta}\Omega_M.
+\label{eq:analytic-exp}
+\end{equation}
+The implementation uses Eq.~\eqref{eq:analytic-exp} instead of a generic dense matrix exponential. For very small \(\theta\), the ratio \(\sin\theta/\theta\) is replaced by its Taylor expansion to avoid numerical loss of significance.
+
+\section{Fourth-Order Runge--Kutta Solver}
+
+The comparison solver is the classical fourth-order Runge--Kutta method applied to
+\begin{equation}
+\dot{\psi}=f(t,\psi)=A(t)\psi.
+\end{equation}
+For a step from \(t_n\) to \(t_{n+1}=t_n+\Delta t\),
+\begin{align}
+k_1 &= f(t_n,\psi_n),\\
+k_2 &= f(t_n+\Delta t/2,\psi_n+\Delta t k_1/2),\\
+k_3 &= f(t_n+\Delta t/2,\psi_n+\Delta t k_2/2),\\
+k_4 &= f(t_n+\Delta t,\psi_n+\Delta t k_3),\\
+\psi_{n+1} &= \psi_n+\frac{\Delta t}{6}(k_1+2k_2+2k_3+k_4).
+\end{align}
+RK4 also has local error \(O(\Delta t^5)\) and global error \(O(\Delta t^4)\), but it is not a unitary integrator. Even when \(A(t)\) is anti-Hermitian, the polynomial RK4 update does not exactly lie on the unitary group. Norm drift is therefore expected and is used as a diagnostic. In the current reproduction, RK4 uses four internal substeps per plotted Magnus step, giving an effective RK4 resolution of 320 steps per period.
+
+\section{Why Both Methods Are Used}
+
+The fourth-order Magnus method is the primary solver because it respects the quantum structure of the problem. It preserves state normalization and is well suited for long-time Floquet evolution. RK4 is retained as an independent fourth-order comparison because it is simple, widely understood, and does not share the same exponential-update structure. Agreement between the two methods in \(\langle\sigma_x(t)\rangle\), together with small Magnus norm drift, provides a useful consistency check.
+
+\section{Diagnostics Used in the Reproduction}
+
+The script records the following quantities for both \(\alpha_{13}\) and the detuned value \(\alpha=81.60\):
+\begin{itemize}
+  \item maximum Magnus4 norm drift, \(\max_t |\|\psi(t)\|-1|\);
+  \item maximum RK4 norm drift;
+  \item maximum absolute difference between Magnus4 and RK4 values of \(\langle\sigma_x(t)\rangle\);
+  \item dominant normalized spectral frequency of the Magnus4 trace;
+  \item fractional-period projection data sampled at \(0,T/4,T/2,3T/4\) within every period.
+\end{itemize}
+
+\begin{table}[h]
+\centering
+\caption{Latest diagnostic summary.}
+\begin{tabular}{lcc}
+\toprule
+Quantity & Refined \(\alpha_{13}\) & Detuned \(\alpha=81.60\) \\
+\midrule
+Magnus4 maximum norm drift & \(4.02\times10^{-5}\) & \(3.92\times10^{-5}\) \\
+RK4 maximum norm drift & \(1.59\times10^{-3}\) & \(1.79\times10^{-3}\) \\
+Max. \(\langle\sigma_x\rangle\) solver difference & \(8.35\times10^{-3}\) & \(6.50\times10^{-3}\) \\
+Dominant \(\tilde{\omega}/\omega\) & 0.4998 & 0.5498 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Interpretation}
+
+For the refined \(\alpha_{13}\), the dominant spectral response is very close to \(\tilde{\omega}/\omega=1/2\), and fractional-period projections collapse into a small number of fixed points. For the detuned value, the response is less locked and the projection points spread along the quarter circle. These two cases together distinguish the special symmetry-enforced parameter from a nearby imperfect parameter.
+
+\end{document}

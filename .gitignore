@@ -1,0 +1,12 @@
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+__pycache__/
+.history/
+tmp/
+output/interacting_reproduction_package/
+*.nohuplog
+*.pid
+slurm-*.out

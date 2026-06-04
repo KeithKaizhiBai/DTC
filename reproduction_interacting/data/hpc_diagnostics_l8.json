@@ -1,0 +1,55 @@
+{
+  "timestamp_unix": 1780564766.1507246,
+  "device": "cuda",
+  "cuda_device_name": "NVIDIA H100 80GB HBM3",
+  "interaction_j": 0.2,
+  "boundary": "open",
+  "trace": {
+    "alpha_81p60": {
+      "alpha": 81.6,
+      "length": 8,
+      "max_norm_error": 1.7881393432617188e-07,
+      "dominant_spectrum_omega_over_drive": 0.4998958550302021,
+      "mx_min": -0.9938375949859619,
+      "mx_max": 1.0
+    },
+    "alpha_13": {
+      "alpha": 80.04624211689759,
+      "length": 8,
+      "max_norm_error": 1.7881393432617188e-07,
+      "dominant_spectrum_omega_over_drive": 0.4998958550302021,
+      "mx_min": -0.993770956993103,
+      "mx_max": 1.0
+    }
+  },
+  "stroboscopic": {
+    "alpha_81p60": {
+      "alpha": 81.6,
+      "max_period": 100000,
+      "sampling_mode": "log_floquet",
+      "lengths": {
+        "8": {
+          "max_norm_error": 2.392826954977778e-05,
+          "sample_count": 1793,
+          "z_min": -0.9224109174159036,
+          "z_mean_first_20": 0.8438137034381729,
+          "z_final": 0.6632937038288163
+        }
+      }
+    },
+    "alpha_13": {
+      "alpha": 80.04624211689759,
+      "max_period": 100000000,
+      "sampling_mode": "log_floquet",
+      "lengths": {
+        "8": {
+          "max_norm_error": 1.6414119166974217e-05,
+          "sample_count": 1801,
+          "z_min": -0.9897012878617779,
+          "z_mean_first_20": 0.9936762472101905,
+          "z_final": -0.03507990511487957
+        }
+      }
+    }
+  }
+}

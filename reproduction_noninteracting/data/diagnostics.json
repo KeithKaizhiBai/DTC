@@ -1,0 +1,35 @@
+{
+  "device": "cuda",
+  "cuda_device_name": "NVIDIA GeForce RTX 4090",
+  "alpha_13_table": 80.07,
+  "alpha_13_refined": 80.04624211689759,
+  "alpha_13_one_period_return_probability": 3.567988829396123e-18,
+  "alpha_detuned": 81.6,
+  "periods_to_plot": 40,
+  "steps_per_period": 80,
+  "rk4_substeps_per_output_step": 4,
+  "rk4_effective_steps_per_period": 320,
+  "fractional_samples_per_period": 4,
+  "fractional_sample_phases": [
+    "0",
+    "T/4",
+    "T/2",
+    "3T/4"
+  ],
+  "cases": {
+    "alpha_13": {
+      "alpha": 80.04624211689759,
+      "magnus4_max_norm_drift": 4.017353057861328e-05,
+      "rk4_max_norm_drift": 0.0015908479690551758,
+      "max_abs_sigma_x_difference_magnus4_vs_rk4": 0.008349731098860502,
+      "dominant_spectrum_omega_over_drive": 0.499843798812871
+    },
+    "alpha_81p60": {
+      "alpha": 81.6,
+      "magnus4_max_norm_drift": 3.921985626220703e-05,
+      "rk4_max_norm_drift": 0.0017856955528259277,
+      "max_abs_sigma_x_difference_magnus4_vs_rk4": 0.006501778960227966,
+      "dominant_spectrum_omega_over_drive": 0.549828178694158
+    }
+  }
+}
